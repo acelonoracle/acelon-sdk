@@ -12,6 +12,7 @@ export interface FetchPricesParams {
     from: string
     to: string
     price?: number | number[]
+    timestamp?: number
   }>
   protocol: Protocol
   exchanges?: string[]
@@ -54,6 +55,20 @@ export interface SignedPrice {
   }
   packed: string
   signature: string
+}
+
+export interface CombinedSignedPrice {
+  priceData: {
+    from: string
+    to: string
+    price: number | number[]
+    timestamp: number
+    sources: Array<{ exchangeId: string; certificate: string }>
+    requestHash: string
+  }
+  packed: string[]
+  signatures: string[]
+  pubKeys: string[]
 }
 
 export interface CheckExchangeHealthResult {

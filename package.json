@@ -1,13 +1,20 @@
 {
   "name": "acurast-oracle-service-sdk",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "author": "Lorenzo Spoleti <l.spoleti@papers.ch>",
   "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "yarn run ts-node ./src/test.ts",
+    "test": "yarn run ts-node ./test/test.ts",
     "prepublishOnly": "yarn build"
   },
+  "keywords": [
+    "acurast",
+    "oracle",
+    "sdk"
+  ],
   "dependencies": {
     "@acurast/dapp": "^1.0.1-beta.6",
     "@types/node": "^22.2.0",
@@ -20,5 +27,8 @@
   "devDependencies": {
     "@types/elliptic": "^6.4.18",
     "ts-node": "^10.9.2"
-  }
+  },
+  "files": [
+    "dist/**/*"
+  ]
 }
