@@ -6,7 +6,6 @@
 .env
 combined_src_files.txt
 combineSrcFiles.py
-test
 
 # User-specific files
 *.suo

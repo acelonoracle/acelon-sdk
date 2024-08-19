@@ -8,16 +8,24 @@ import {
   CheckExchangeHealthParams,
   FetchPricesParams,
   FetchPricesResult,
-  CombinedSignedPrice,
   PriceInfo,
   AggregationType,
+  GetPricesResult,
 } from "./types"
 
 type OracleResponse<T> = {
   result: T
+  error?: {
+    code: number
+    message: string
+    data?: any
+  }
   sender: string
 }
 
+/**
+ * AcurastOracleSDK provides methods to interact with the Acurast Oracle network.
+ */
 export class AcurastOracleSDK {
   private client: AcurastClient
   private keyPair: { privateKey: string; publicKey: string }
@@ -28,32 +36,40 @@ export class AcurastOracleSDK {
       reject: Function
       timer: NodeJS.Timeout
       responses: Map<string, any>
+      errorResponses: Map<string, any>
       requiredResponses: number
     }
   > = new Map()
   private initPromise: Promise<void>
   private oracles: string[]
   private timeout: number
+  private logging: boolean
 
   private idToPubKeyMap: Record<string, string> = {}
 
+  /**
+   * Creates an instance of AcurastOracleSDK.
+   * @param {AcurastOracleSDKOptions} options - The configuration options.
+   */
   constructor(options: AcurastOracleSDKOptions) {
     this.client = new AcurastClient(options.websocketUrls)
     this.keyPair = this.generateKeyPair()
     this.oracles = options.oracles || [] //TODO set default oracles
     this.timeout = options.timeout || 30 * 1000 // Default 10 seconds timeout
+    this.logging = options.logging || false
+
     this.initPromise = this.init()
   }
 
   // Initialize the WebSocket connection and sets up message handling
   private async init(): Promise<void> {
-    console.log("🛜 Opening websocket connection ...")
+    this.log("🛜 Opening websocket connection ...")
     try {
       await this.client.start({
         secretKey: this.keyPair.privateKey,
         publicKey: this.keyPair.publicKey,
       })
-      console.log("✅ Connection opened")
+      this.log("✅ Connection opened")
 
       // map oracle public keys to their ids
       this.idToPubKeyMap = {}
@@ -64,7 +80,7 @@ export class AcurastOracleSDK {
 
       this.client.onMessage(this.handleMessage.bind(this))
     } catch (error) {
-      console.error("❌ Failed to open connection:", error)
+      this.log(`❌ Failed to open connection:, ${error}`)
       throw error
     }
   }
@@ -77,31 +93,46 @@ export class AcurastOracleSDK {
       publicKey: keyPair.getPublic(true, "hex"),
     }
   }
-
   private handleMessage(message: any) {
     try {
       const payload = JSON.parse(Buffer.from(message.payload, "hex").toString())
       const sender = Buffer.from(message.sender).toString("hex")
-      console.log("📦 Parsed payload:", JSON.stringify(payload, null, 2))
+      this.log(`📦 Received payload from ${sender}`)
 
       // Requests are divided by ID. Each call to sendRequestToOracles creates a new ID, so we can
       // track the responses for each request separately
       const pendingRequest = this.pendingRequests.get(payload.id)
       if (pendingRequest) {
-        pendingRequest.responses.set(sender, { result: payload.result, sender })
+        if (payload.error) {
+          this.log(`❌ Received error from ${sender}: ${payload.error}`, "error")
+          pendingRequest.errorResponses.set(sender, { error: payload.error, sender })
+        } else {
+          pendingRequest.responses.set(sender, { result: payload.result, sender })
+        }
 
+        const totalResponses = pendingRequest.responses.size + pendingRequest.errorResponses.size
+        const remainingOracles = this.oracles.length - totalResponses
         // If we've received enough responses, resolve the promise
         if (pendingRequest.responses.size >= pendingRequest.requiredResponses) {
           clearTimeout(pendingRequest.timer)
           this.pendingRequests.delete(payload.id)
           pendingRequest.resolve(Array.from(pendingRequest.responses.values()))
+        } else if (remainingOracles + pendingRequest.responses.size < pendingRequest.requiredResponses) {
+          // If it will not be possible to get enough responses, reject the promise
+          clearTimeout(pendingRequest.timer)
+          this.pendingRequests.delete(payload.id)
+          pendingRequest.reject(
+            new Error(
+              `Insufficient responses: ${pendingRequest.responses.size} success, ${pendingRequest.errorResponses.size} errors, ${remainingOracles} remaining`
+            )
+          )
         }
       } else {
         // If we receive a response for a request we're not tracking, ignore it
-        console.warn("🥱 Received response for untracked request ... ingnoring", payload)
+        this.log(`🥱 Received response for untracked request ... ignoring ${payload}`, "warn")
       }
     } catch (error) {
-      console.error("❌ Error parsing message:", error)
+      this.log(`❌ Error parsing message: ${error}`, "error")
     }
   }
 
@@ -116,7 +147,8 @@ export class AcurastOracleSDK {
 
     return new Promise((resolve, reject) => {
       const requestId = uuidv4()
-      const responses = new Map<string, any>()
+      const responses = new Map<string, OracleResponse<T>>()
+      const errorResponses = new Map<string, OracleResponse<T>>()
 
       const timer = setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
@@ -130,12 +162,13 @@ export class AcurastOracleSDK {
         reject,
         timer,
         responses,
+        errorResponses,
         requiredResponses,
       })
 
       this.oracles.forEach((oracle) => {
         this.sendRequest(method, params, oracle, requestId).catch((error) => {
-          console.error(`❌ Failed to send request to oracle ${oracle}:`, error)
+          this.log(`❌ Failed to send request to oracle ${oracle}: ${error}`, "error")
         })
       })
     })
@@ -155,7 +188,7 @@ export class AcurastOracleSDK {
     }
 
     const message = JSON.stringify(request)
-    console.log(`📤 Sending ${method} request to oracle ${oracle}:`, message)
+    this.log(`📤 Sending ${method} request to oracle ${oracle}: ${message}`)
 
     await this.client.send(oracle, message)
   }
@@ -166,7 +199,13 @@ export class AcurastOracleSDK {
     return Object.values(priceInfo.validation).every((value) => value === true)
   }
 
-  async getPrice(params: FetchPricesParams, verifications: number = 0): Promise<CombinedSignedPrice[]> {
+  /**
+   * Fetches price data from the oracle network.
+   * @param {FetchPricesParams} params - The parameters for fetching prices.
+   * @param {number} verifications - The number of verifications required (default: 0).
+   * @returns {Promise<GetPricesResult[]>} A promise that resolves to an array of combined signed prices.
+   */
+  async getPrices(params: FetchPricesParams, verifications: number = 0): Promise<GetPricesResult[]> {
     await this.initPromise
 
     const fetchPrices = async (
@@ -175,6 +214,7 @@ export class AcurastOracleSDK {
       validCheck: boolean = false
     ): Promise<OracleResponse<FetchPricesResult>[]> => {
       const responses = await this.sendRequestToOracles<FetchPricesResult>("fetchPrices", params, requiredResponses)
+
       return validCheck
         ? responses.filter((response) =>
             response.result.priceInfos.every((priceInfo: PriceInfo, index: number) => this.isValidResponse(priceInfo))
@@ -202,13 +242,13 @@ export class AcurastOracleSDK {
       return this.combineSignedPrices(validResponses)
     } else {
       // Otherwise, fetch initial prices and use them for verification
-      console.log(
+      this.log(
         `⭐ ${params.pairs.map((pair) => pair.from + "-" + pair.to)} Fetching initial prices for verification...`
       )
       const initialResponses = await fetchPrices(params, 1)
       handleInsufficientResponses(initialResponses, 1)
       const firstResponse = initialResponses[0].result
-      console.log("📬 Initial prices fetched:", firstResponse)
+      this.log(`📬 Initial prices fetched: ${firstResponse}`)
 
       const verificationParams = {
         ...params,
@@ -224,12 +264,12 @@ export class AcurastOracleSDK {
 
       const validVerifications = await fetchPrices(verificationParams, verifications, true)
       handleInsufficientResponses(validVerifications, verifications)
-      console.log("🟢 Verifications:", validVerifications.length)
+      this.log(`🟢 Verifications: ${validVerifications.length}`)
       return this.combineSignedPrices(validVerifications)
     }
   }
 
-  private combineSignedPrices(responses: OracleResponse<FetchPricesResult>[]): CombinedSignedPrice[] {
+  private combineSignedPrices(responses: OracleResponse<FetchPricesResult>[]): GetPricesResult[] {
     if (responses.length === 0) {
       return []
     }
@@ -259,19 +299,49 @@ export class AcurastOracleSDK {
     return combinedSignedPrices
   }
 
-  async getExchanges(params: CheckExchangeHealthParams): Promise<string[]> {
-    return this.sendRequestToOracles<CheckExchangeHealthResult>("checkExchangeHealth", params)
+  /**
+   * Retrieves a list of available exchanges.
+   * @param {CheckExchangeHealthParams} params - The parameters for checking exchange health.
+   * @returns {Promise<string[]>} A promise that resolves to an array of available exchange IDs.
+   */
+  async getExchanges(params?: CheckExchangeHealthParams, requiredResponses: number = 0): Promise<string[]> {
+    return this.sendRequestToOracles<CheckExchangeHealthResult>("checkExchangeHealth", params || {}, requiredResponses)
       .then((responses) => {
-        return responses[0].result.healthStatuses.filter((info) => info.status === "up").map((info) => info.exchangeId)
+        const exchanges: Set<string> = new Set()
+        responses.forEach((response) => {
+          response.result.healthStatuses
+            .filter((info) => info.status === "up")
+            .forEach((info) => exchanges.add(info.exchangeId))
+        })
+        return Array.from(exchanges)
       })
       .catch((error) => {
-        console.error("❌ Error checking exchange health:", error)
+        this.log(`❌ Error checking exchange health: ${error}`, "error")
         throw error
       })
   }
 
+  /**
+   * Closes the WebSocket connection.
+   * @returns {Promise<void>} A promise that resolves when the connection is closed.
+   */
   async close(): Promise<void> {
     await this.initPromise
     this.client.close()
+  }
+
+  private log(message: string, type: "default" | "warn" | "error" = "default"): void {
+    if (!this.logging) return
+
+    switch (type) {
+      case "warn":
+        console.warn(message)
+        break
+      case "error":
+        console.error(message)
+        break
+      default:
+        console.log(message)
+    }
   }
 }
