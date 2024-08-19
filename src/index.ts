@@ -1,7 +1,7 @@
-import { AcurastClient } from '@acurast/dapp'
-import { ec } from 'elliptic'
-import { Buffer } from 'buffer'
-import { v4 as uuidv4 } from 'uuid'
+import { AcurastClient } from "@acurast/dapp"
+import { ec } from "elliptic"
+import { Buffer } from "buffer"
+import { v4 as uuidv4 } from "uuid"
 import {
   AcurastOracleSDKOptions,
   CheckExchangeHealthResult,
@@ -11,7 +11,7 @@ import {
   CombinedSignedPrice,
   PriceInfo,
   AggregationType,
-} from './types'
+} from "./types"
 
 type OracleResponse<T> = {
   result: T
@@ -47,13 +47,13 @@ export class AcurastOracleSDK {
 
   // Initialize the WebSocket connection and sets up message handling
   private async init(): Promise<void> {
-    console.log('🛜 Opening websocket connection ...')
+    console.log("🛜 Opening websocket connection ...")
     try {
       await this.client.start({
         secretKey: this.keyPair.privateKey,
         publicKey: this.keyPair.publicKey,
       })
-      console.log('✅ Connection opened')
+      console.log("✅ Connection opened")
 
       // map oracle public keys to their ids
       this.idToPubKeyMap = {}
@@ -64,25 +64,25 @@ export class AcurastOracleSDK {
 
       this.client.onMessage(this.handleMessage.bind(this))
     } catch (error) {
-      console.error('❌ Failed to open connection:', error)
+      console.error("❌ Failed to open connection:", error)
       throw error
     }
   }
 
   private generateKeyPair() {
-    const EC = new ec('p256')
+    const EC = new ec("p256")
     const keyPair = EC.genKeyPair()
     return {
-      privateKey: keyPair.getPrivate('hex'),
-      publicKey: keyPair.getPublic(true, 'hex'),
+      privateKey: keyPair.getPrivate("hex"),
+      publicKey: keyPair.getPublic(true, "hex"),
     }
   }
 
   private handleMessage(message: any) {
     try {
-      const payload = JSON.parse(Buffer.from(message.payload, 'hex').toString())
-      const sender = Buffer.from(message.sender).toString('hex')
-      console.log('📦 Parsed payload:', JSON.stringify(payload, null, 2))
+      const payload = JSON.parse(Buffer.from(message.payload, "hex").toString())
+      const sender = Buffer.from(message.sender).toString("hex")
+      console.log("📦 Parsed payload:", JSON.stringify(payload, null, 2))
 
       // Requests are divided by ID. Each call to sendRequestToOracles creates a new ID, so we can
       // track the responses for each request separately
@@ -98,13 +98,10 @@ export class AcurastOracleSDK {
         }
       } else {
         // If we receive a response for a request we're not tracking, ignore it
-        console.warn(
-          '🥱 Received response for untracked request ... ingnoring',
-          payload
-        )
+        console.warn("🥱 Received response for untracked request ... ingnoring", payload)
       }
     } catch (error) {
-      console.error('❌ Error parsing message:', error)
+      console.error("❌ Error parsing message:", error)
     }
   }
 
@@ -151,7 +148,7 @@ export class AcurastOracleSDK {
     requestId: string
   ): Promise<void> {
     const request = {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id: requestId,
       method,
       params,
@@ -169,10 +166,7 @@ export class AcurastOracleSDK {
     return Object.values(priceInfo.validation).every((value) => value === true)
   }
 
-  async getPrice(
-    params: FetchPricesParams,
-    verifications: number = 0
-  ): Promise<CombinedSignedPrice[]> {
+  async getPrice(params: FetchPricesParams, verifications: number = 0): Promise<CombinedSignedPrice[]> {
     await this.initPromise
 
     const fetchPrices = async (
@@ -180,29 +174,17 @@ export class AcurastOracleSDK {
       requiredResponses: number,
       validCheck: boolean = false
     ): Promise<OracleResponse<FetchPricesResult>[]> => {
-      const responses = await this.sendRequestToOracles<FetchPricesResult>(
-        'fetchPrices',
-        params,
-        requiredResponses
-      )
+      const responses = await this.sendRequestToOracles<FetchPricesResult>("fetchPrices", params, requiredResponses)
       return validCheck
         ? responses.filter((response) =>
-            response.result.priceInfos.every(
-              (priceInfo: PriceInfo, index: number) =>
-                this.isValidResponse(priceInfo)
-            )
+            response.result.priceInfos.every((priceInfo: PriceInfo, index: number) => this.isValidResponse(priceInfo))
           )
         : responses
     }
 
-    const handleInsufficientResponses = (
-      validResponses: OracleResponse<FetchPricesResult>[],
-      required: number
-    ) => {
+    const handleInsufficientResponses = (validResponses: OracleResponse<FetchPricesResult>[], required: number) => {
       if (validResponses.length < required) {
-        throw new Error(
-          `Only ${validResponses.length} valid responses received, ${required} required`
-        )
+        throw new Error(`Only ${validResponses.length} valid responses received, ${required} required`)
       }
     }
 
@@ -221,14 +203,12 @@ export class AcurastOracleSDK {
     } else {
       // Otherwise, fetch initial prices and use them for verification
       console.log(
-        `⭐ ${params.pairs.map(
-          (pair) => pair.from + '-' + pair.to
-        )} Fetching initial prices for verification...`
+        `⭐ ${params.pairs.map((pair) => pair.from + "-" + pair.to)} Fetching initial prices for verification...`
       )
       const initialResponses = await fetchPrices(params, 1)
       handleInsufficientResponses(initialResponses, 1)
       const firstResponse = initialResponses[0].result
-      console.log('📬 Initial prices fetched:', firstResponse)
+      console.log("📬 Initial prices fetched:", firstResponse)
 
       const verificationParams = {
         ...params,
@@ -236,72 +216,56 @@ export class AcurastOracleSDK {
           ...pair,
           price:
             firstResponse.priceInfos[index].price[
-              Object.keys(
-                firstResponse.priceInfos[index].price
-              )[0] as AggregationType
+              Object.keys(firstResponse.priceInfos[index].price)[0] as AggregationType
             ],
           timestamp: firstResponse.priceInfos[index].timestamp,
         })),
       }
 
-      const validVerifications = await fetchPrices(
-        verificationParams,
-        verifications,
-        true
-      )
+      const validVerifications = await fetchPrices(verificationParams, verifications, true)
       handleInsufficientResponses(validVerifications, verifications)
-      console.log('🟢 Verifications:', validVerifications.length)
+      console.log("🟢 Verifications:", validVerifications.length)
       return this.combineSignedPrices(validVerifications)
     }
   }
 
-  private combineSignedPrices(
-    responses: OracleResponse<FetchPricesResult>[]
-  ): CombinedSignedPrice[] {
+  private combineSignedPrices(responses: OracleResponse<FetchPricesResult>[]): CombinedSignedPrice[] {
     if (responses.length === 0) {
       return []
     }
 
     // Use the first response's priceData for each pair
-    const combinedSignedPrices = responses[0].result.signedPrices.map(
-      (firstSignedPrice) => {
-        const allSignedPrices = responses.flatMap((response) =>
-          response.result.signedPrices
-            .filter(
-              (sp) =>
-                sp.priceData.from === firstSignedPrice.priceData.from &&
-                sp.priceData.to === firstSignedPrice.priceData.to
-            )
-            .map((sp) => ({
-              ...sp,
-              pubKey: this.idToPubKeyMap[response.sender],
-            }))
-        )
+    const combinedSignedPrices = responses[0].result.signedPrices.map((firstSignedPrice) => {
+      const allSignedPrices = responses.flatMap((response) =>
+        response.result.signedPrices
+          .filter(
+            (sp) =>
+              sp.priceData.from === firstSignedPrice.priceData.from && sp.priceData.to === firstSignedPrice.priceData.to
+          )
+          .map((sp) => ({
+            ...sp,
+            pubKey: this.idToPubKeyMap[response.sender],
+          }))
+      )
 
-        return {
-          priceData: firstSignedPrice.priceData,
-          packed: allSignedPrices.map((sp) => sp.packed),
-          signatures: allSignedPrices.map((sp) => sp.signature),
-          pubKeys: allSignedPrices.map((sp) => sp.pubKey),
-        }
+      return {
+        priceData: firstSignedPrice.priceData,
+        packed: allSignedPrices.map((sp) => sp.packed),
+        signatures: allSignedPrices.map((sp) => sp.signature),
+        pubKeys: allSignedPrices.map((sp) => sp.pubKey),
       }
-    )
+    })
 
     return combinedSignedPrices
   }
 
   async getExchanges(params: CheckExchangeHealthParams): Promise<string[]> {
-    return this.sendRequestToOracles<CheckExchangeHealthResult>(
-      'checkExchangeHealth',
-      params
-    )
+    return this.sendRequestToOracles<CheckExchangeHealthResult>("checkExchangeHealth", params)
       .then((responses) => {
-        return responses[0].result.healthStatuses
-          .filter((info) => info.status === 'up')
-          .map((info) => info.exchangeId)
+        return responses[0].result.healthStatuses.filter((info) => info.status === "up").map((info) => info.exchangeId)
       })
       .catch((error) => {
-        console.error('❌ Error checking exchange health:', error)
+        console.error("❌ Error checking exchange health:", error)
         throw error
       })
   }
