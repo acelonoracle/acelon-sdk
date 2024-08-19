@@ -3,7 +3,7 @@ import { AcurastOracleSDKOptions, FetchPricesParams } from "../dist/types"
 
 async function testSDK() {
   const options: AcurastOracleSDKOptions = {
-    websocketUrls: ["wss://websocket-proxy-1.prod.gke.acurast.com", "wss://websocket-proxy-2.prod.gke.acurast.com"],
+    wssUrls: ["wss://websocket-proxy-1.prod.gke.acurast.com", "wss://websocket-proxy-2.prod.gke.acurast.com"],
     oracles: [
       "0x027ab24fbd4035567b879dd842f59e0b7241f11a23f5db241750b51b312ea0f5ed",
       "0x03292132b532986021a203a5417cd0034acbe1d7a40c5685eedb46be5efdf9bc32",

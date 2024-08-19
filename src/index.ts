@@ -11,17 +11,8 @@ import {
   PriceInfo,
   AggregationType,
   GetPricesResult,
+  OracleResponse,
 } from "./types"
-
-type OracleResponse<T> = {
-  result: T
-  error?: {
-    code: number
-    message: string
-    data?: any
-  }
-  sender: string
-}
 
 /**
  * AcurastOracleSDK provides methods to interact with the Acurast Oracle network.
@@ -52,7 +43,7 @@ export class AcurastOracleSDK {
    * @param {AcurastOracleSDKOptions} options - The configuration options.
    */
   constructor(options: AcurastOracleSDKOptions) {
-    this.client = new AcurastClient(options.websocketUrls)
+    this.client = new AcurastClient(options.wssUrls)
     this.keyPair = this.generateKeyPair()
     this.oracles = options.oracles || [] //TODO set default oracles
     this.timeout = options.timeout || 30 * 1000 // Default 10 seconds timeout
@@ -104,7 +95,7 @@ export class AcurastOracleSDK {
       const pendingRequest = this.pendingRequests.get(payload.id)
       if (pendingRequest) {
         if (payload.error) {
-          this.log(`❌ Received error from ${sender}: ${payload.error}`, "error")
+          this.log(`❌ Received error from ${sender}: ${JSON.stringify(payload.error)}`, "error")
           pendingRequest.errorResponses.set(sender, { error: payload.error, sender })
         } else {
           pendingRequest.responses.set(sender, { result: payload.result, sender })
@@ -331,8 +322,6 @@ export class AcurastOracleSDK {
   }
 
   private log(message: string, type: "default" | "warn" | "error" = "default"): void {
-    if (!this.logging) return
-
     switch (type) {
       case "warn":
         console.warn(message)
@@ -341,7 +330,9 @@ export class AcurastOracleSDK {
         console.error(message)
         break
       default:
-        console.log(message)
+        if (this.logging) {
+          console.log(message)
+        }
     }
   }
 }

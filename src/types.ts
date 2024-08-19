@@ -10,21 +10,21 @@ export type AggregationType = "median" | "mean" | "min" | "max"
 
 /**
  * Configuration options for the AcurastOracleSDK.
- * @property {string[]} websocketUrls - Array of WebSocket URLs to connect to the Acurast processors.
+ * @property {string[]} wssUrls - Array of WebSocket URLs to connect to the Acurast processors.
  * @property {string[]} [oracles] - Array of processor public keys.
  * @property {number} [timeout] - Timeout in milliseconds for the requests.
  */
 export interface AcurastOracleSDKOptions {
-  websocketUrls: string[]
+  wssUrls: string[]
   oracles?: string[]
-  timeout?: number,
+  timeout?: number
   logging?: boolean
 }
 
 /**
  * Parameters for fetching price data.
  * @property {Array<{from: string, to: string, price?: number | number[], timestamp?: number}>} pairs - Pairs to fetch prices for.
- * @property {Protocol} protocol - Protocol to package the price data for.
+ * @property {Protocol} protocol - Protocol to package and sign the price data for.
  * @property {string[]} [exchanges] - List of exchange IDs to use as sources on the oracles. Default: all available exchanges.
  * @property {number} [minSources] - Minimum number of sources required. Default: 3.
  * @property {number} [tradeAgeLimit] - Maximum age of trade data in seconds. Default: 5 minutes.
@@ -98,26 +98,31 @@ export interface PriceInfo {
 }
 
 /**
+ * Price data.
+ * @property {string} from - From symbol.
+ * @property {string} to - To symbol.
+ * @property {number | number[]} price - Aggregated price(s).
+ * @property {number} timestamp - Timestamp of the price data in ms.
+ * @property {Array<{exchangeId: string, certificate: string}>} sources - Map exchangeID to the certificate for sources used.
+ * @property {string} requestHash - Hash of the original request parameters.
+ */
+export interface PriceData {
+  from: string
+  to: string
+  price: number | number[]
+  timestamp: number
+  sources: Array<{ exchangeId: string; certificate: string }>
+  requestHash: string
+}
+
+/**
  * Signed price data for a single pair.
  * @property {Object} priceData - Price data that was signed.
- * @property {string} packed - Packed representation of the price data.
- * @property {string} signature - Signature of the packed price data.
+ * @property {string} packed - Price data in the packed format for the chosen protocol.
+ * @property {string} signature - Oracle signatures.
  */
 export interface SignedPrice {
-  priceData: {
-    /** @property {string} from - From symbol. */
-    from: string
-    /** @property {string} to - To symbol. */
-    to: string
-    /** @property {number | number[]} price - Aggregated price(s). */
-    price: number | number[]
-    /** @property {number} timestamp - Timestamp of the price data. */
-    timestamp: number
-    /** @property {Array<{exchangeId: string, certificate: string}>} sources - Information about the sources used for this price data. */
-    sources: Array<{ exchangeId: string; certificate: string }>
-    /** @property {string} requestHash - Hash of the original request parameters. */
-    requestHash: string
-  }
+  priceData: PriceData
   packed: string
   signature: string
 }
@@ -125,25 +130,12 @@ export interface SignedPrice {
 /**
  * Result of getting prices, including multiple signatures.
  * @property {Object} priceData - Price data that was signed.
- * @property {string[]} packed - Array of packed representations of the price data.
- * @property {string[]} signatures - Array of signatures corresponding to the packed price data.
- * @property {string[]} pubKeys - Array of public keys corresponding to the signatures.
+ * @property {string[]} packed - Price data in the packed format for the chosen protocol.
+ * @property {string[]} signatures - Oracle signatures.
+ * @property {string[]} pubKeys - Oracle public keys.
  */
 export interface GetPricesResult {
-  priceData: {
-    /** @property {string} from - From symbol. */
-    from: string
-    /** @property {string} to - To symbol. */
-    to: string
-    /** @property {number | number[]} price - Aggregated price(s). */
-    price: number | number[]
-    /** @property {number} timestamp - Timestamp of the price data. */
-    timestamp: number
-    /** @property {Array<{exchangeId: string, certificate: string}>} sources - Information about the sources used for this price data. */
-    sources: Array<{ exchangeId: string; certificate: string }>
-    /** @property {string} requestHash - Hash of the original request parameters. */
-    requestHash: string
-  }
+  priceData: PriceData
   packed: string[]
   signatures: string[]
   pubKeys: string[]
@@ -161,10 +153,20 @@ export interface CheckExchangeHealthResult {
  * Health status of a single exchange.
  * @property {string} exchangeId - ID of the exchange.
  * @property {"up" | "down"} status - Current status of the exchange.
- * @property {number} [responseTime] - Response time in milliseconds, if available.
+ * @property {number} [responseTime] - Response time in milliseconds.
  */
 export interface ExchangeHealthStatus {
   exchangeId: string
   status: "up" | "down"
   responseTime?: number
+}
+
+export type OracleResponse<T> = {
+  result: T
+  error?: {
+    code: number
+    message: string
+    data?: any
+  }
+  sender: string
 }
