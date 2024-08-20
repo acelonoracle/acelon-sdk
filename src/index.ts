@@ -46,7 +46,7 @@ export class AcurastOracleSDK {
     this.client = new AcurastClient(options.wssUrls)
     this.keyPair = this.generateKeyPair()
     this.oracles = options.oracles || [] //TODO set default oracles
-    this.timeout = options.timeout || 30 * 1000 // Default 10 seconds timeout
+    this.timeout = options.timeout || 10 * 1000 // Default 10 seconds timeout
     this.logging = options.logging || false
 
     this.initPromise = this.init()
