@@ -245,10 +245,7 @@ export class AcurastOracleSDK {
         ...params,
         pairs: params.pairs.map((pair, index) => ({
           ...pair,
-          price:
-            firstResponse.priceInfos[index].price[
-              Object.keys(firstResponse.priceInfos[index].price)[0] as AggregationType
-            ],
+          price: Object.values(firstResponse.priceInfos[index].price),
           timestamp: firstResponse.priceInfos[index].timestamp,
         })),
       }
