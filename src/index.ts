@@ -9,7 +9,6 @@ import {
   FetchPricesParams,
   FetchPricesResult,
   PriceInfo,
-  AggregationType,
   GetPricesResult,
   OracleResponse,
 } from "./types"
@@ -28,6 +27,7 @@ export class AcurastOracleSDK {
       timer: NodeJS.Timeout
       responses: Map<string, any>
       errorResponses: Map<string, any>
+      errorCounts: Map<number, number>
       requiredResponses: number
     }
   > = new Map()
@@ -35,6 +35,7 @@ export class AcurastOracleSDK {
   private oracles: string[]
   private timeout: number
   private logging: boolean
+  private errorThreshold: number
 
   private idToPubKeyMap: Record<string, string> = {}
 
@@ -48,6 +49,7 @@ export class AcurastOracleSDK {
     this.oracles = options.oracles || [] //TODO set default oracles
     this.timeout = options.timeout || 10 * 1000 // Default 10 seconds timeout
     this.logging = options.logging || false
+    this.errorThreshold = options.errorThreshold || 0.5
 
     this.initPromise = this.init()
   }
@@ -97,6 +99,22 @@ export class AcurastOracleSDK {
         if (payload.error) {
           this.log(`❌ Received error from ${sender}: ${JSON.stringify(payload.error)}`, "error")
           pendingRequest.errorResponses.set(sender, { error: payload.error, sender })
+
+          // Increment the count for this specific error code
+          const errorCode = payload.error.code
+          const currentCount = (pendingRequest.errorCounts.get(errorCode) || 0) + 1
+          pendingRequest.errorCounts.set(errorCode, currentCount)
+
+          // Check if this error type has reached the threshold
+          const errorThresholdCount = Math.ceil(this.oracles.length * this.errorThreshold)
+          if (currentCount >= errorThresholdCount) {
+            clearTimeout(pendingRequest.timer)
+            this.pendingRequests.delete(payload.id)
+            pendingRequest.reject(
+              new Error(`${errorCode}: ${payload.error.message} : ${payload.error.data}`)
+            )
+            return
+          }
         } else {
           pendingRequest.responses.set(sender, { result: payload.result, sender })
         }
@@ -140,6 +158,7 @@ export class AcurastOracleSDK {
       const requestId = uuidv4()
       const responses = new Map<string, OracleResponse<T>>()
       const errorResponses = new Map<string, OracleResponse<T>>()
+      const errorCounts = new Map<number, number>()
 
       const timer = setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
@@ -154,6 +173,7 @@ export class AcurastOracleSDK {
         timer,
         responses,
         errorResponses,
+        errorCounts,
         requiredResponses,
       })
 
