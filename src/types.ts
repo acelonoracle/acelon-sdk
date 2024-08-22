@@ -109,7 +109,7 @@ export interface PriceInfo {
  * @property {string} from - From symbol.
  * @property {string} to - To symbol.
  * @property {number} decimals - Decimals of the price.
- * @property {number | number[]} price - Aggregated price(s).
+ * @property {number[]} price - Aggregated price(s).
  * @property {number} timestamp - Timestamp of the price data in ms.
  * @property {Array<{exchangeId: string, certificate: string}>} sources - Map exchangeID to the certificate for sources used.
  * @property {string} requestHash - Hash of the original request parameters.
