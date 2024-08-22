@@ -87,7 +87,8 @@ await sdk.close()
     priceData: {
       from: "BTC",
       to: "USDT",
-      price: 50000,
+      decimals: 8,
+      price: 5000000000000,
       timestamp: 1629300000000,
       sources: [
         { exchangeId: "BNC", certificate: "cert1" },
@@ -103,7 +104,8 @@ await sdk.close()
     priceData: {
       from: "ETH",
       to: "USDT",
-      price: 3000,
+      decimals: 8,
+      price: 300000000000,
       timestamp: 1629300000000,
       sources: [
         { exchangeId: "BNC", certificate: "cert1" },
@@ -121,7 +123,7 @@ await sdk.close()
 ### getExchanges Response
 
 ```typescript
-["BNC", "CBP", "BFX", "KRK", "GEM"]
+;["BNC", "CBP", "BFX", "KRK", "GEM"]
 ```
 
 ## Description
@@ -138,6 +140,7 @@ constructor(options: AcurastOracleSDKOptions)
 - `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the AcurastOracleService.
 - `options.timeout`: (Optional) Timeout in milliseconds for the requests.
 - `options.logging`: (Optional) Enable or disable logs. Default: false.
+- `options.errorThreshold`: (Optional) Value from 0 to 1 that determines the percentage of oracles that have to respond with the same error for it to be thrown by the sdk.
 
 #### Methods
 
@@ -149,6 +152,7 @@ Fetches price data from the oracle network.
   - `pairs`: Array of Pairs, Pairs to fetch prices for:
     - `from`: String, from symbol.
     - `to`: String, to symbol.
+    - `decimals`: Number of decimals for the price.
     - `price`: (Optional) Price(s) to verify against the oracle price. (Provide a price per aggregatyion type requested)
     - `timestamp`: (Optional) Number, timestamp of the provided prices.
   - `protocol`: Protocol to package and sign the price data for.
@@ -169,6 +173,7 @@ Each object contains the following properties:
 
    - `from`: String - From symbol.
    - `to`: String - To symbol.
+   - `decimals`: Number of decimals for the price.
    - `price`: Number or Number[] - Aggregated price(s).
    - `timestamp`: Number - Timestamp of the price data in ms.
    - `sources`: Array of Objects - Map exchangeID to the certificate for sources used.

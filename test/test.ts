@@ -5,11 +5,10 @@ async function testSDK() {
   const options: AcurastOracleSDKOptions = {
     wssUrls: ["wss://websocket-proxy-1.prod.gke.acurast.com", "wss://websocket-proxy-2.prod.gke.acurast.com"],
     oracles: [
-      "0x02696d6b3a93a0888490f00faacb9080f170e850ce59eae3f9cbb1cf11e3b05c16",
-      "0x038a8ac78dfcaa925a4119d0a88e70e1d4d7b8c2f8973a692fa137604093c00144",
-      "0x03e09f94727687ee139dff49ea46ba181f5cc335febbf5caf3d7568187e224530f",
-      "0x03eb026b19046bd09fb5fa0e3b335567efcc43dd98de9d8c00d6789dfe4a38d658",
-      "0x03d14b97145d62f1aa9f867ee1edb947725e25fdb5bc11d31e335b3fe20b60b16c",
+      "0x02bce6d10f4e63ef1ee9ba391c4ab495bb71b2f519d977a2e1a61f4976050debe7",
+      "0x038d8b64652b49afc3b7708691663bb2fad2e47cd9117ee2ec6fdf8734d09b67c2",
+      "0x02964a08d6e25c242f506a6262be2cd56765a22cc72c6baf1ed3992bcf02540ccb",
+      "0x03d99b4f665d5c2bb3c5497016836a54e3acf7113290f6bab35f0f829c4f7cea4a",
     ],
     logging: true,
   }
@@ -17,10 +16,8 @@ async function testSDK() {
 
   try {
     const priceParams1: FetchPricesParams = {
-      pairs: [{ from: "PEPE", to: "USDT", precision: 8 }],
+      pairs: [{ from: "PEPE", to: "USDT", decimals: 6 }],
       protocol: "EVM" as any,
-      exchanges: ["binance", "kucoin"],
-      minSources: 3,
     }
 
     const priceParams2: FetchPricesParams = {

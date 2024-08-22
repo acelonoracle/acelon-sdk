@@ -40,14 +40,14 @@ export interface FetchPricesParams {
    * Pairs to fetch prices for.
    * @property {string} from - From symbol.
    * @property {string} to - To symbol.
-   * @property {number} [precision] - Decimal precision of the price. Default: 6.
+   * @property {number} [decimals] -  Decimals of the price. Default: 8.
    * @property {number | number[]} [price] - Price(s) to verify against the oracle price. (Provide a price per aggregatyion type requested)
    * @property {number} [timestamp] - Timestamp of the provided prices.
    */
   pairs: Array<{
     from: string
     to: string
-    precision?: number
+    decimals?: number
     price?: number | number[]
     timestamp?: number
   }>
@@ -84,6 +84,7 @@ export interface FetchPricesResult {
  * Detailed price information for a single pair.
  * @property {string} from - From symbol.
  * @property {string} to - To symbol.
+ * @property {number} decimals - Decimals of the price.
  * @property {Partial<Record<AggregationType, number>>} price - Aggregated prices for each requested aggregation type.
  * @property {Partial<Record<AggregationType, boolean>>} [validation] - Validation results for each aggregation type, if applicable.
  * @property {number} timestamp - Timestamp of the price data.
@@ -94,6 +95,7 @@ export interface FetchPricesResult {
 export interface PriceInfo {
   from: string
   to: string
+  decimals: number
   price: Partial<Record<AggregationType, number>>
   validation?: Partial<Record<AggregationType, boolean>>
   timestamp: number
@@ -106,6 +108,7 @@ export interface PriceInfo {
  * Price data.
  * @property {string} from - From symbol.
  * @property {string} to - To symbol.
+ * @property {number} decimals - Decimals of the price.
  * @property {number | number[]} price - Aggregated price(s).
  * @property {number} timestamp - Timestamp of the price data in ms.
  * @property {Array<{exchangeId: string, certificate: string}>} sources - Map exchangeID to the certificate for sources used.
@@ -114,7 +117,8 @@ export interface PriceInfo {
 export interface PriceData {
   from: string
   to: string
-  price: number | number[]
+  decimals: number
+  price: number[]
   timestamp: number
   sources: Array<{ exchangeId: string; certificate: string }>
   requestHash: string
