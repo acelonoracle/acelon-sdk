@@ -40,12 +40,14 @@ export interface FetchPricesParams {
    * Pairs to fetch prices for.
    * @property {string} from - From symbol.
    * @property {string} to - To symbol.
+   * @property {number} [precision] - Decimal precision of the price. Default: 6.
    * @property {number | number[]} [price] - Price(s) to verify against the oracle price. (Provide a price per aggregatyion type requested)
    * @property {number} [timestamp] - Timestamp of the provided prices.
    */
   pairs: Array<{
     from: string
     to: string
+    precision?: number
     price?: number | number[]
     timestamp?: number
   }>

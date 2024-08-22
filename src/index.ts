@@ -11,6 +11,8 @@ import {
   PriceInfo,
   GetPricesResult,
   OracleResponse,
+  AggregationType,
+  Protocol,
 } from "./types"
 
 /**
@@ -110,35 +112,22 @@ export class AcurastOracleSDK {
           if (currentCount >= errorThresholdCount) {
             clearTimeout(pendingRequest.timer)
             this.pendingRequests.delete(payload.id)
-            pendingRequest.reject(
-              new Error(`${errorCode}: ${payload.error.message} : ${payload.error.data}`)
-            )
+            pendingRequest.reject(new Error(`${errorCode}: ${payload.error.message} : ${payload.error.data}`))
             return
           }
         } else {
           pendingRequest.responses.set(sender, { result: payload.result, sender })
         }
 
-        const totalResponses = pendingRequest.responses.size + pendingRequest.errorResponses.size
-        const remainingOracles = this.oracles.length - totalResponses
         // If we've received enough responses, resolve the promise
         if (pendingRequest.responses.size >= pendingRequest.requiredResponses) {
           clearTimeout(pendingRequest.timer)
           this.pendingRequests.delete(payload.id)
           pendingRequest.resolve(Array.from(pendingRequest.responses.values()))
-        } else if (remainingOracles + pendingRequest.responses.size < pendingRequest.requiredResponses) {
-          // If it will not be possible to get enough responses, reject the promise
-          clearTimeout(pendingRequest.timer)
-          this.pendingRequests.delete(payload.id)
-          pendingRequest.reject(
-            new Error(
-              `Insufficient responses: ${pendingRequest.responses.size} success, ${pendingRequest.errorResponses.size} errors, ${remainingOracles} remaining`
-            )
-          )
         }
       } else {
         // If we receive a response for a request we're not tracking, ignore it
-        this.log(`🥱 Received response for untracked request ... ignoring ${payload}`, "warn")
+        //this.log(`🥱 Received response for untracked request ... ignoring ${payload}`, "warn")
       }
     } catch (error) {
       this.log(`❌ Error parsing message: ${error}`, "error")
@@ -210,6 +199,64 @@ export class AcurastOracleSDK {
     return Object.values(priceInfo.validation).every((value) => value === true)
   }
 
+  private validateFetchPricesParams(params: FetchPricesParams): void {
+    // Check if pairs is present and has at least one pair
+    if (!params.pairs || params.pairs.length === 0) {
+      throw new Error("Pairs array must contain at least one pair")
+    }
+
+    // Check each pair
+    params.pairs.forEach((pair, index) => {
+      if (!pair.from || !pair.to) {
+        throw new Error(`Pair at index ${index} must have 'from' and 'to' fields`)
+      }
+    })
+
+    // Check if protocol is present
+    if (!params.protocol) {
+      throw new Error("Protocol field is required")
+    }
+
+    // Check if protocol is valid
+    const validProtocols: Protocol[] = ["Substrate", "EVM", "WASM", "Tezos"]
+    if (!validProtocols.includes(params.protocol)) {
+      throw new Error(`Invalid protocol: ${params.protocol}`)
+    }
+
+    // Check minSources against exchanges length
+    if (params.exchanges && params.minSources && params.minSources > params.exchanges.length) {
+      throw new Error(
+        `minSources (${params.minSources}) cannot be greater than the number of exchanges (${params.exchanges.length})`
+      )
+    }
+
+    // Check tradeAgeLimit
+    if (params.tradeAgeLimit !== undefined && params.tradeAgeLimit <= 0) {
+      throw new Error("tradeAgeLimit must be positive")
+    }
+
+    // Check aggregation
+    if (params.aggregation) {
+      const validAggregationTypes: AggregationType[] = ["median", "mean", "min", "max"]
+      const aggregations = Array.isArray(params.aggregation) ? params.aggregation : [params.aggregation]
+      aggregations.forEach((agg) => {
+        if (!validAggregationTypes.includes(agg)) {
+          throw new Error(`Invalid aggregation type: ${agg}`)
+        }
+      })
+    }
+
+    // Check maxSourcesDeviation
+    if (params.maxSourcesDeviation !== undefined && params.maxSourcesDeviation <= 0) {
+      throw new Error("maxSourcesDeviation must be positive")
+    }
+
+    // Check maxValidationDiff
+    if (params.maxValidationDiff !== undefined && params.maxValidationDiff <= 0) {
+      throw new Error("maxValidationDiff must be positive")
+    }
+  }
+
   /**
    * Fetches price data from the oracle network.
    * @param {FetchPricesParams} params - The parameters for fetching prices.
@@ -218,6 +265,8 @@ export class AcurastOracleSDK {
    */
   async getPrices(params: FetchPricesParams, verifications: number = 0): Promise<GetPricesResult[]> {
     await this.initPromise
+
+    this.validateFetchPricesParams(params)
 
     const fetchPrices = async (
       params: FetchPricesParams,

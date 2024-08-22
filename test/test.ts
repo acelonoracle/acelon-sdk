@@ -5,25 +5,39 @@ async function testSDK() {
   const options: AcurastOracleSDKOptions = {
     wssUrls: ["wss://websocket-proxy-1.prod.gke.acurast.com", "wss://websocket-proxy-2.prod.gke.acurast.com"],
     oracles: [
-      "0x033e0a6bcc12fd3e8d0fd95eed690adafbfb4920a846a178f024cc92758b60409d",
-      "0x0254803abdff960ffaea5b23fb1a246874985e146b216945637b7b9582604c56a1",
-      "0x036fe65107e5c86508d5aab23f1fa2727e0a5f1196ce796ba0866f3ede3c724af8",
-      "0x0376eb8659621201f3505ae66dd325b52f2b4114b071f9411bff16dfa6c899e6bc",
-      "0x037fb9f66de653ae6156c4dc9fb0dfbcd5fb9f4e84c2980d00a6f666536ad036fa",
+      "0x02696d6b3a93a0888490f00faacb9080f170e850ce59eae3f9cbb1cf11e3b05c16",
+      "0x038a8ac78dfcaa925a4119d0a88e70e1d4d7b8c2f8973a692fa137604093c00144",
+      "0x03e09f94727687ee139dff49ea46ba181f5cc335febbf5caf3d7568187e224530f",
+      "0x03eb026b19046bd09fb5fa0e3b335567efcc43dd98de9d8c00d6789dfe4a38d658",
+      "0x03d14b97145d62f1aa9f867ee1edb947725e25fdb5bc11d31e335b3fe20b60b16c",
     ],
     logging: true,
   }
   const sdk = new AcurastOracleSDK(options)
 
   try {
-    const priceParams: FetchPricesParams = {
-      pairs: [{ from: "BTC", to: "null" }],
-      protocol: "EVM",
-      aggregation: ["mean", "min", "max"],
+    const priceParams1: FetchPricesParams = {
+      pairs: [{ from: "PEPE", to: "USDT", precision: 8 }],
+      protocol: "EVM" as any,
+      exchanges: ["binance", "kucoin"],
+      minSources: 3,
     }
 
-    const prices = await sdk.getPrices(priceParams, 2)
-    console.log("Prices:", prices[0].priceData.price, prices)
+    const priceParams2: FetchPricesParams = {
+      pairs: [{ from: "SOL", to: "USDT" }],
+      protocol: "Tezos",
+    }
+
+    const prices = await sdk.getPrices(priceParams1, 3)
+    // const prices = await Promise.all([sdk.getPrices(priceParams1, 3), sdk.getPrices(priceParams2, 3)])
+    console.log("Prices:", JSON.stringify(prices, null, 2))
+  } catch (error) {
+    console.error("Error:", error)
+  }
+
+  try {
+    const exchanges = await sdk.getExchanges()
+    console.log("Exchanges:", exchanges)
   } catch (error) {
     console.error("Error:", error)
   }
