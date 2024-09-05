@@ -25,13 +25,29 @@ export interface AcurastOracleSDKOptions {
 }
 
 /**
+ * Pair of symbols to fetch prices for.
+ * @property {string} from - From symbol.
+ * @property {string} to - To symbol.
+ * @property {number} [decimals] - Decimals of the price. Default: 8.
+ * @property {number | number[]} [price] - Price(s) to verify against the oracle price. (Provide a price per aggregatyion type requested)
+ * @property {number} [timestamp] - Timestamp of the provided prices.
+ */
+export interface Pair {
+  from: string
+  to: string
+  decimals?: number
+  price?: number | number[]
+  timestamp?: number
+}
+
+/**
  * Parameters for fetching price data.
- * @property {Array<{from: string, to: string, price?: number | number[], timestamp?: number}>} pairs - Pairs to fetch prices for.
+ * @property {Array<Pair>} pairs - Pairs to fetch prices for.
  * @property {Protocol} protocol - Protocol to package and sign the price data for.
  * @property {string[]} [exchanges] - List of exchange IDs to use as sources on the oracles. Default: all available exchanges.
  * @property {number} [minSources] - Minimum number of sources required. Default: 3.
  * @property {number} [tradeAgeLimit] - Maximum age of trade data in seconds. Default: 5 minutes.
- * @property {AggregationType | AggregationType[]} [aggregation] - Types of price aggregation requested from the oracles. Default: mean.
+ * @property {AggregationType | AggregationType[]} [aggregation] - Types of price aggregation requested from the oracles. Default: median.
  * @property {number} [maxSourcesDeviation] - Maximum allowed standard deviation between prices in the sources. Default: no limit.
  * @property {number} [maxValidationDiff] - Maximum allowed price difference for validation against client. Default: 0.05%.
  */
@@ -44,13 +60,7 @@ export interface FetchPricesParams {
    * @property {number | number[]} [price] - Price(s) to verify against the oracle price. (Provide a price per aggregatyion type requested)
    * @property {number} [timestamp] - Timestamp of the provided prices.
    */
-  pairs: Array<{
-    from: string
-    to: string
-    decimals?: number
-    price?: number | number[]
-    timestamp?: number
-  }>
+  pairs: Array<Pair>
   protocol: Protocol
   exchanges?: string[]
   minSources?: number
