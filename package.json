@@ -1,6 +1,6 @@
 {
-  "name": "acurast-oracle-service-sdk",
-  "version": "0.0.9",
+  "name": "@acurast/oracle-service-sdk",
+  "version": "1.0.0",
   "author": "Lorenzo Spoleti <l.spoleti@papers.ch>",
   "license": "MIT",
   "main": "dist/index.js",

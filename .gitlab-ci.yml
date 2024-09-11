@@ -1,0 +1,26 @@
+image: docker:latest
+
+variables:
+  GOOGLE_TAG: eu.gcr.io/papers-kubernetes/acurast-oracle-service-sdk:$CI_COMMIT_SHA
+  GOOGLE_TAG_LATEST: eu.gcr.io/papers-kubernetes/acurast-oracle-service-sdk:latest
+
+stages:
+  - build
+  - publish
+
+build:
+  stage: build
+  script:
+    - docker build -t $GOOGLE_TAG .
+  tags:
+    - docker
+
+publish:
+  stage: publish
+  only:
+    - main
+  when: manual
+  script:
+    - docker run --env NPM_AUTH_TOKEN --name unit-$CI_COMMIT_SHA $GOOGLE_TAG ./npm-ci-publish.sh
+  tags:
+    - docker
