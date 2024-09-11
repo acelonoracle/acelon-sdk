@@ -21,6 +21,6 @@ publish:
     - main
   when: manual
   script:
-    - docker run --env NPM_AUTH_TOKEN --name unit-$CI_COMMIT_SHA $GOOGLE_TAG ./npm-ci-publish.sh
+    - docker run --env NPM_AUTH_TOKEN --name unit-$CI_COMMIT_SHA $GOOGLE_TAG sh ./npm-ci-publish.sh
   tags:
     - docker
