@@ -107,7 +107,7 @@ export class AcurastOracleSDK {
   }> {
     try {
       const response = await fetch(
-        'https://storage.googleapis.com/acurast-oracle-service/sdk_settings.json'
+        'https://acurast-oracle-service.storage.googleapis.com/sdk_settings.json'
       )
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
