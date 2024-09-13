@@ -27,10 +27,9 @@ First, import and initialize the AcurastOracleSDK:
 import { AcurastOracleSDK } from "acurast-oracle-sdk"
 
 const sdk = new AcurastOracleSDK({
-  wssUrls: ["wss://websocket-proxy-1.prod.gke.acurast.com", "wss://websocket-proxy-2.prod.gke.acurast.com"],
-  oracles: ["oracle1_public_key", "oracle2_public_key", "oracle3_public_key"],
   timeout: 5000, // (optional) default 10 seconds
-  logging: true,
+  logging: true, // (optional) default false
+  errorThreshold: 0.333, // (optional) default 0.333
 })
 ```
 
@@ -136,11 +135,11 @@ await sdk.close()
 constructor(options: AcurastOracleSDKOptions)
 ```
 
-- `options.wssUrls`: Array of WebSocket URLs to connect to the Acurast processors.
-- `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the AcurastOracleService.
-- `options.timeout`: (Optional) Timeout in milliseconds for the requests.
+- `options.wssUrls`: (Optional) Array of WebSocket URLs to connect to the Acurast processors.
+- `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the AcurastOracleService. By default it will use the public keys from the AcurastOracleService.
+- `options.timeout`: (Optional) Timeout in milliseconds for the requests. Default: 10 seconds.
 - `options.logging`: (Optional) Enable or disable logs. Default: false.
-- `options.errorThreshold`: (Optional) Value from 0 to 1 that determines the percentage of oracles that have to respond with the same error for it to be thrown by the sdk.
+- `options.errorThreshold`: (Optional) Value from 0 to 1 that determines the percentage of oracles that have to respond with the same error for it to be thrown by the sdk. Default: 0.333.
 
 #### Methods
 

@@ -1,7 +1,7 @@
-import { AcurastClient } from "@acurast/dapp"
-import { ec } from "elliptic"
-import { Buffer } from "buffer"
-import { v4 as uuidv4 } from "uuid"
+import { AcurastClient } from '@acurast/dapp'
+import { ec } from 'elliptic'
+import { Buffer } from 'buffer'
+import { v4 as uuidv4 } from 'uuid'
 import {
   AcurastOracleSDKOptions,
   CheckExchangeHealthResult,
@@ -13,13 +13,13 @@ import {
   OracleResponse,
   AggregationType,
   Protocol,
-} from "./types"
+} from './types'
 
 /**
  * AcurastOracleSDK provides methods to interact with the Acurast Oracle network.
  */
 export class AcurastOracleSDK {
-  private client: AcurastClient
+  private client!: AcurastClient
   private keyPair: { privateKey: string; publicKey: string }
   private pendingRequests: Map<
     string,
@@ -34,7 +34,8 @@ export class AcurastOracleSDK {
     }
   > = new Map()
   private initPromise: Promise<void>
-  private oracles: string[]
+  private oracles: string[] = []
+  private wssUrls: string[] = []
   private timeout: number
   private logging: boolean
   private errorThreshold: number
@@ -46,52 +47,91 @@ export class AcurastOracleSDK {
    * @param {AcurastOracleSDKOptions} options - The configuration options.
    */
   constructor(options: AcurastOracleSDKOptions) {
-    this.client = new AcurastClient(options.wssUrls)
     this.keyPair = this.generateKeyPair()
-    this.oracles = options.oracles || [] //TODO set default oracles
     this.timeout = options.timeout || 10 * 1000 // Default 10 seconds timeout
     this.logging = options.logging || false
-    this.errorThreshold = options.errorThreshold || 0.5
+    this.errorThreshold = options.errorThreshold || 0.333
 
-    this.initPromise = this.init()
+    this.initPromise = this.init(options)
   }
 
-  // Initialize the WebSocket connection and sets up message handling
-  private async init(): Promise<void> {
-    this.log("🛜 Opening websocket connection ...")
+  private async init(options: AcurastOracleSDKOptions): Promise<void> {
+    this.log('🔍 Fetching default settings ...')
+    const defaultSettings = await this.fetchDefaultSettings()
+    this.log(
+      `Fetched settings default settings ${JSON.stringify(defaultSettings)}`
+    )
+
+    if (options.oracles && options.oracles.length > 0) {
+      this.log(`Using provided oracles : ${options.oracles}`)
+      this.oracles = options.oracles
+    } else if (defaultSettings.oracles.length > 0) {
+      this.log('Using default oracles ...')
+      this.oracles = defaultSettings.oracles
+    } else {
+      throw new Error('No oracles provided')
+    }
+
+    if (options.wssUrls && options.wssUrls.length > 0) {
+      this.log(`Using provided wssUrls : ${options.wssUrls}`)
+      this.wssUrls = options.wssUrls
+    } else if (defaultSettings.wssUrls.length > 0) {
+      this.log('Using default wssUrls ...')
+      this.wssUrls = defaultSettings.wssUrls
+    } else {
+      throw new Error('No wssUrls provided')
+    }
+
+    this.log('🛜 Opening websocket connection ...')
     try {
+      // Use default wssUrls if not provided in options
+      const wssUrls = options.wssUrls || defaultSettings.wssUrls
+      this.client = new AcurastClient(wssUrls)
+
       await this.client.start({
         secretKey: this.keyPair.privateKey,
         publicKey: this.keyPair.publicKey,
       })
-      this.log("✅ Connection opened")
+      this.log('✅ Connection opened')
 
-      // map oracle public keys to their ids
-      this.idToPubKeyMap = {}
-      this.oracles.map((oracle) => {
-        const id = this.client.idFromPublicKey(oracle)
-        this.idToPubKeyMap[id] = oracle
-      })
-
-      this.client.onMessage(this.handleMessage.bind(this))
+      // ... rest of the init method ...
     } catch (error) {
       this.log(`❌ Failed to open connection:, ${error}`)
       throw error
     }
   }
 
+  private async fetchDefaultSettings(): Promise<{
+    wssUrls: string[]
+    oracles: string[]
+  }> {
+    try {
+      const response = await fetch(
+        'https://storage.googleapis.com/acurast-oracle-service/sdk_settings.json'
+      )
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const settings = await response.json()
+      return settings
+    } catch (error) {
+      this.log(`Failed to fetch default settings: ${error}`, 'error')
+      return { wssUrls: [], oracles: [] }
+    }
+  }
+
   private generateKeyPair() {
-    const EC = new ec("p256")
+    const EC = new ec('p256')
     const keyPair = EC.genKeyPair()
     return {
-      privateKey: keyPair.getPrivate("hex"),
-      publicKey: keyPair.getPublic(true, "hex"),
+      privateKey: keyPair.getPrivate('hex'),
+      publicKey: keyPair.getPublic(true, 'hex'),
     }
   }
   private handleMessage(message: any) {
     try {
-      const payload = JSON.parse(Buffer.from(message.payload, "hex").toString())
-      const sender = Buffer.from(message.sender).toString("hex")
+      const payload = JSON.parse(Buffer.from(message.payload, 'hex').toString())
+      const sender = Buffer.from(message.sender).toString('hex')
       this.log(`📦 Received payload from ${sender}`)
 
       // Requests are divided by ID. Each call to sendRequestToOracles creates a new ID, so we can
@@ -99,24 +139,42 @@ export class AcurastOracleSDK {
       const pendingRequest = this.pendingRequests.get(payload.id)
       if (pendingRequest) {
         if (payload.error) {
-          this.log(`❌ Received error from ${sender}: ${JSON.stringify(payload.error)}`, "error")
-          pendingRequest.errorResponses.set(sender, { error: payload.error, sender })
+          this.log(
+            `❌ Received error from ${sender}: ${JSON.stringify(
+              payload.error
+            )}`,
+            'error'
+          )
+          pendingRequest.errorResponses.set(sender, {
+            error: payload.error,
+            sender,
+          })
 
           // Increment the count for this specific error code
           const errorCode = payload.error.code
-          const currentCount = (pendingRequest.errorCounts.get(errorCode) || 0) + 1
+          const currentCount =
+            (pendingRequest.errorCounts.get(errorCode) || 0) + 1
           pendingRequest.errorCounts.set(errorCode, currentCount)
 
           // Check if this error type has reached the threshold
-          const errorThresholdCount = Math.ceil(this.oracles.length * this.errorThreshold)
+          const errorThresholdCount = Math.ceil(
+            this.oracles.length * this.errorThreshold
+          )
           if (currentCount >= errorThresholdCount) {
             clearTimeout(pendingRequest.timer)
             this.pendingRequests.delete(payload.id)
-            pendingRequest.reject(new Error(`${errorCode}: ${payload.error.message} : ${payload.error.data}`))
+            pendingRequest.reject(
+              new Error(
+                `${errorCode}: ${payload.error.message} : ${payload.error.data}`
+              )
+            )
             return
           }
         } else {
-          pendingRequest.responses.set(sender, { result: payload.result, sender })
+          pendingRequest.responses.set(sender, {
+            result: payload.result,
+            sender,
+          })
         }
 
         // If we've received enough responses, resolve the promise
@@ -130,7 +188,7 @@ export class AcurastOracleSDK {
         //this.log(`🥱 Received response for untracked request ... ignoring ${payload}`, "warn")
       }
     } catch (error) {
-      this.log(`❌ Error parsing message: ${error}`, "error")
+      this.log(`❌ Error parsing message: ${error}`, 'error')
     }
   }
 
@@ -168,7 +226,10 @@ export class AcurastOracleSDK {
 
       this.oracles.forEach((oracle) => {
         this.sendRequest(method, params, oracle, requestId).catch((error) => {
-          this.log(`❌ Failed to send request to oracle ${oracle}: ${error}`, "error")
+          this.log(
+            `❌ Failed to send request to oracle ${oracle}: ${error}`,
+            'error'
+          )
         })
       })
     })
@@ -181,7 +242,7 @@ export class AcurastOracleSDK {
     requestId: string
   ): Promise<void> {
     const request = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: requestId,
       method,
       params,
@@ -202,29 +263,35 @@ export class AcurastOracleSDK {
   private validateFetchPricesParams(params: FetchPricesParams): void {
     // Check if pairs is present and has at least one pair
     if (!params.pairs || params.pairs.length === 0) {
-      throw new Error("Pairs array must contain at least one pair")
+      throw new Error('Pairs array must contain at least one pair')
     }
 
     // Check each pair
     params.pairs.forEach((pair, index) => {
       if (!pair.from || !pair.to) {
-        throw new Error(`Pair at index ${index} must have 'from' and 'to' fields`)
+        throw new Error(
+          `Pair at index ${index} must have 'from' and 'to' fields`
+        )
       }
     })
 
     // Check if protocol is present
     if (!params.protocol) {
-      throw new Error("Protocol field is required")
+      throw new Error('Protocol field is required')
     }
 
     // Check if protocol is valid
-    const validProtocols: Protocol[] = ["Substrate", "EVM", "WASM", "Tezos"]
+    const validProtocols: Protocol[] = ['Substrate', 'EVM', 'WASM', 'Tezos']
     if (!validProtocols.includes(params.protocol)) {
       throw new Error(`Invalid protocol: ${params.protocol}`)
     }
 
     // Check minSources against exchanges length
-    if (params.exchanges && params.minSources && params.minSources > params.exchanges.length) {
+    if (
+      params.exchanges &&
+      params.minSources &&
+      params.minSources > params.exchanges.length
+    ) {
       throw new Error(
         `minSources (${params.minSources}) cannot be greater than the number of exchanges (${params.exchanges.length})`
       )
@@ -232,13 +299,20 @@ export class AcurastOracleSDK {
 
     // Check tradeAgeLimit
     if (params.tradeAgeLimit !== undefined && params.tradeAgeLimit <= 0) {
-      throw new Error("tradeAgeLimit must be positive")
+      throw new Error('tradeAgeLimit must be positive')
     }
 
     // Check aggregation
     if (params.aggregation) {
-      const validAggregationTypes: AggregationType[] = ["median", "mean", "min", "max"]
-      const aggregations = Array.isArray(params.aggregation) ? params.aggregation : [params.aggregation]
+      const validAggregationTypes: AggregationType[] = [
+        'median',
+        'mean',
+        'min',
+        'max',
+      ]
+      const aggregations = Array.isArray(params.aggregation)
+        ? params.aggregation
+        : [params.aggregation]
       aggregations.forEach((agg) => {
         if (!validAggregationTypes.includes(agg)) {
           throw new Error(`Invalid aggregation type: ${agg}`)
@@ -247,13 +321,19 @@ export class AcurastOracleSDK {
     }
 
     // Check maxSourcesDeviation
-    if (params.maxSourcesDeviation !== undefined && params.maxSourcesDeviation <= 0) {
-      throw new Error("maxSourcesDeviation must be positive")
+    if (
+      params.maxSourcesDeviation !== undefined &&
+      params.maxSourcesDeviation <= 0
+    ) {
+      throw new Error('maxSourcesDeviation must be positive')
     }
 
     // Check maxValidationDiff
-    if (params.maxValidationDiff !== undefined && params.maxValidationDiff <= 0) {
-      throw new Error("maxValidationDiff must be positive")
+    if (
+      params.maxValidationDiff !== undefined &&
+      params.maxValidationDiff <= 0
+    ) {
+      throw new Error('maxValidationDiff must be positive')
     }
   }
 
@@ -263,7 +343,10 @@ export class AcurastOracleSDK {
    * @param {number} verifications - The number of verifications required (default: 0).
    * @returns {Promise<GetPricesResult[]>} A promise that resolves to an array of combined signed prices.
    */
-  async getPrices(params: FetchPricesParams, verifications: number = 0): Promise<GetPricesResult[]> {
+  async getPrices(
+    params: FetchPricesParams,
+    verifications: number = 0
+  ): Promise<GetPricesResult[]> {
     await this.initPromise
 
     this.validateFetchPricesParams(params)
@@ -273,18 +356,30 @@ export class AcurastOracleSDK {
       requiredResponses: number,
       validCheck: boolean = false
     ): Promise<OracleResponse<FetchPricesResult>[]> => {
-      const responses = await this.sendRequestToOracles<FetchPricesResult>("fetchPrices", params, requiredResponses)
+      const responses = await this.sendRequestToOracles<FetchPricesResult>(
+        'fetchPrices',
+        params,
+        requiredResponses
+      )
 
       return validCheck
         ? responses.filter((response) =>
-            response.result.priceInfos.every((priceInfo: PriceInfo, index: number) => this.isValidResponse(priceInfo))
+            response.result.priceInfos.every(
+              (priceInfo: PriceInfo, index: number) =>
+                this.isValidResponse(priceInfo)
+            )
           )
         : responses
     }
 
-    const handleInsufficientResponses = (validResponses: OracleResponse<FetchPricesResult>[], required: number) => {
+    const handleInsufficientResponses = (
+      validResponses: OracleResponse<FetchPricesResult>[],
+      required: number
+    ) => {
       if (validResponses.length < required) {
-        throw new Error(`Only ${validResponses.length} valid responses received, ${required} required`)
+        throw new Error(
+          `Only ${validResponses.length} valid responses received, ${required} required`
+        )
       }
     }
 
@@ -303,7 +398,9 @@ export class AcurastOracleSDK {
     } else {
       // Otherwise, fetch initial prices and use them for verification
       this.log(
-        `⭐ ${params.pairs.map((pair) => pair.from + "-" + pair.to)} Fetching initial prices for verification...`
+        `⭐ ${params.pairs.map(
+          (pair) => pair.from + '-' + pair.to
+        )} Fetching initial prices for verification...`
       )
       const initialResponses = await fetchPrices(params, 1)
       handleInsufficientResponses(initialResponses, 1)
@@ -319,39 +416,48 @@ export class AcurastOracleSDK {
         })),
       }
 
-      const validVerifications = await fetchPrices(verificationParams, verifications, true)
+      const validVerifications = await fetchPrices(
+        verificationParams,
+        verifications,
+        true
+      )
       handleInsufficientResponses(validVerifications, verifications)
       this.log(`🟢 Verifications: ${validVerifications.length}`)
       return this.combineSignedPrices(validVerifications)
     }
   }
 
-  private combineSignedPrices(responses: OracleResponse<FetchPricesResult>[]): GetPricesResult[] {
+  private combineSignedPrices(
+    responses: OracleResponse<FetchPricesResult>[]
+  ): GetPricesResult[] {
     if (responses.length === 0) {
       return []
     }
 
     // Use the first response's priceData for each pair
-    const combinedSignedPrices = responses[0].result.signedPrices.map((firstSignedPrice) => {
-      const allSignedPrices = responses.flatMap((response) =>
-        response.result.signedPrices
-          .filter(
-            (sp) =>
-              sp.priceData.from === firstSignedPrice.priceData.from && sp.priceData.to === firstSignedPrice.priceData.to
-          )
-          .map((sp) => ({
-            ...sp,
-            pubKey: this.idToPubKeyMap[response.sender],
-          }))
-      )
+    const combinedSignedPrices = responses[0].result.signedPrices.map(
+      (firstSignedPrice) => {
+        const allSignedPrices = responses.flatMap((response) =>
+          response.result.signedPrices
+            .filter(
+              (sp) =>
+                sp.priceData.from === firstSignedPrice.priceData.from &&
+                sp.priceData.to === firstSignedPrice.priceData.to
+            )
+            .map((sp) => ({
+              ...sp,
+              pubKey: this.idToPubKeyMap[response.sender],
+            }))
+        )
 
-      return {
-        priceData: firstSignedPrice.priceData,
-        packed: allSignedPrices.map((sp) => sp.packed),
-        signatures: allSignedPrices.map((sp) => sp.signature),
-        pubKeys: allSignedPrices.map((sp) => sp.pubKey),
+        return {
+          priceData: firstSignedPrice.priceData,
+          packed: allSignedPrices.map((sp) => sp.packed),
+          signatures: allSignedPrices.map((sp) => sp.signature),
+          pubKeys: allSignedPrices.map((sp) => sp.pubKey),
+        }
       }
-    })
+    )
 
     return combinedSignedPrices
   }
@@ -361,19 +467,26 @@ export class AcurastOracleSDK {
    * @param {CheckExchangeHealthParams} params - The parameters for checking exchange health.
    * @returns {Promise<string[]>} A promise that resolves to an array of available exchange IDs.
    */
-  async getExchanges(params?: CheckExchangeHealthParams, requiredResponses: number = 0): Promise<string[]> {
-    return this.sendRequestToOracles<CheckExchangeHealthResult>("checkExchangeHealth", params || {}, requiredResponses)
+  async getExchanges(
+    params?: CheckExchangeHealthParams,
+    requiredResponses: number = 0
+  ): Promise<string[]> {
+    return this.sendRequestToOracles<CheckExchangeHealthResult>(
+      'checkExchangeHealth',
+      params || {},
+      requiredResponses
+    )
       .then((responses) => {
         const exchanges: Set<string> = new Set()
         responses.forEach((response) => {
           response.result.healthStatuses
-            .filter((info) => info.status === "up")
+            .filter((info) => info.status === 'up')
             .forEach((info) => exchanges.add(info.exchangeId))
         })
         return Array.from(exchanges)
       })
       .catch((error) => {
-        this.log(`❌ Error checking exchange health: ${error}`, "error")
+        this.log(`❌ Error checking exchange health: ${error}`, 'error')
         throw error
       })
   }
@@ -387,12 +500,15 @@ export class AcurastOracleSDK {
     this.client.close()
   }
 
-  private log(message: string, type: "default" | "warn" | "error" = "default"): void {
+  private log(
+    message: string,
+    type: 'default' | 'warn' | 'error' = 'default'
+  ): void {
     switch (type) {
-      case "warn":
+      case 'warn':
         console.warn(message)
         break
-      case "error":
+      case 'error':
         console.error(message)
         break
       default:
