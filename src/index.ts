@@ -56,11 +56,20 @@ export class AcurastOracleSDK {
   }
 
   private async init(options: AcurastOracleSDKOptions): Promise<void> {
-    this.log('🔍 Fetching default settings ...')
-    const defaultSettings = await this.fetchDefaultSettings()
-    this.log(
-      `Fetched settings default settings ${JSON.stringify(defaultSettings)}`
-    )
+    let defaultSettings: { wssUrls: string[]; oracles: string[] } = {
+      wssUrls: [],
+      oracles: [],
+    }
+    if (
+      !options.wssUrls ||
+      !options.oracles ||
+      options.wssUrls.length === 0 ||
+      options.oracles.length === 0
+    ) {
+      this.log('🔍 Fetching default settings ...')
+      defaultSettings = await this.fetchDefaultSettings()
+      this.log(`Fetched default settings: ${JSON.stringify(defaultSettings)}`)
+    }
 
     if (options.oracles && options.oracles.length > 0) {
       this.log(`Using provided oracles : ${options.oracles}`)
@@ -84,9 +93,7 @@ export class AcurastOracleSDK {
 
     this.log('🛜 Opening websocket connection ...')
     try {
-      // Use default wssUrls if not provided in options
-      const wssUrls = options.wssUrls || defaultSettings.wssUrls
-      this.client = new AcurastClient(wssUrls)
+      this.client = new AcurastClient(this.wssUrls)
 
       await this.client.start({
         secretKey: this.keyPair.privateKey,
@@ -535,6 +542,15 @@ export class AcurastOracleSDK {
       this.log(`❌ Error pinging oracles: ${error}`, 'error')
       throw error
     }
+  }
+
+  /**
+   * Retrieves the list of oracles.
+   * @returns {Promise<string[]>} A promise that resolves to an array of oracle IDs.
+   */
+  async getOracles(): Promise<string[]> {
+    await this.initPromise
+    return this.oracles
   }
 
   /**
