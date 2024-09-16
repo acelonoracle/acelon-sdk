@@ -94,7 +94,14 @@ export class AcurastOracleSDK {
       })
       this.log('✅ Connection opened')
 
-      // ... rest of the init method ...
+      // map oracle public keys to their ids
+      this.idToPubKeyMap = {}
+      this.oracles.map((oracle) => {
+        const id = this.client.idFromPublicKey(oracle)
+        this.idToPubKeyMap[id] = oracle
+      })
+
+      this.client.onMessage(this.handleMessage.bind(this))
     } catch (error) {
       this.log(`❌ Failed to open connection:, ${error}`)
       throw error
@@ -197,7 +204,8 @@ export class AcurastOracleSDK {
   private async sendRequestToOracles<T>(
     method: string,
     params: FetchPricesParams | CheckExchangeHealthParams,
-    requiredResponses: number = 0
+    requiredResponses: number = 0,
+    enableTimeoutError: boolean = true
   ): Promise<OracleResponse<T>[]> {
     await this.initPromise
 
@@ -209,8 +217,14 @@ export class AcurastOracleSDK {
 
       const timer = setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
-          this.pendingRequests.delete(requestId)
-          reject(new Error(`⌛ Request timed out after ${this.timeout}ms`))
+          if (enableTimeoutError) {
+            this.pendingRequests.delete(requestId)
+            reject(new Error(`Request timed out after ${this.timeout}ms`))
+          } else {
+            const collectedResponses = Array.from(responses.values())
+            this.pendingRequests.delete(requestId)
+            resolve(collectedResponses)
+          }
         }
       }, this.timeout)
 
@@ -489,6 +503,38 @@ export class AcurastOracleSDK {
         this.log(`❌ Error checking exchange health: ${error}`, 'error')
         throw error
       })
+  }
+
+  /**
+   * Pings the oracles.
+   * @returns {Promise<{ status: string; timestamp: number, pubKey: string }[]>} A promise that resolves to the list reachable oracles.
+   */
+  async ping(): Promise<
+    { status: string; timestamp: number; pubKey: string }[]
+  > {
+    await this.initPromise
+
+    try {
+      const responses = await this.sendRequestToOracles<{
+        status: string
+        timestamp: number
+      }>('ping', {}, this.oracles.length, false)
+
+      if (responses.length === 0) {
+        throw new Error('No response received from oracles')
+      }
+
+      const pingResults = responses.map((response) => ({
+        status: response.result.status,
+        timestamp: response.result.timestamp,
+        pubKey: this.idToPubKeyMap[response.sender],
+      }))
+
+      return pingResults
+    } catch (error) {
+      this.log(`❌ Error pinging oracles: ${error}`, 'error')
+      throw error
+    }
   }
 
   /**
