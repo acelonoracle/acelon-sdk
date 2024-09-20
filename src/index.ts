@@ -3,7 +3,7 @@ import { ec } from 'elliptic'
 import { Buffer } from 'buffer'
 import { v4 as uuidv4 } from 'uuid'
 import {
-  AcurastOracleSDKOptions,
+  AcelonSdkOptions,
   CheckExchangeHealthResult,
   CheckExchangeHealthParams,
   FetchPricesParams,
@@ -16,9 +16,9 @@ import {
 } from './types'
 
 /**
- * AcurastOracleSDK provides methods to interact with the Acurast Oracle network.
+ * AcelonSdk provides methods to interact with the Acurast Oracle network.
  */
-export class AcurastOracleSDK {
+export class AcelonSdk {
   private client!: AcurastClient
   private keyPair: { privateKey: string; publicKey: string }
   private pendingRequests: Map<
@@ -43,10 +43,10 @@ export class AcurastOracleSDK {
   private idToPubKeyMap: Record<string, string> = {}
 
   /**
-   * Creates an instance of AcurastOracleSDK.
-   * @param {AcurastOracleSDKOptions} options - The configuration options.
+   * Creates an instance of AcelonSdk.
+   * @param {AcelonSdkOptions} options - The configuration options.
    */
-  constructor(options: AcurastOracleSDKOptions) {
+  constructor(options: AcelonSdkOptions) {
     this.keyPair = this.generateKeyPair()
     this.timeout = options.timeout || 10 * 1000 // Default 10 seconds timeout
     this.logging = options.logging || false
@@ -55,7 +55,7 @@ export class AcurastOracleSDK {
     this.initPromise = this.init(options)
   }
 
-  private async init(options: AcurastOracleSDKOptions): Promise<void> {
+  private async init(options: AcelonSdkOptions): Promise<void> {
     let defaultSettings: { wssUrls: string[]; oracles: string[] } = {
       wssUrls: [],
       oracles: [],

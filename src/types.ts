@@ -9,14 +9,14 @@ export type Protocol = "Substrate" | "EVM" | "WASM" | "Tezos"
 export type AggregationType = "median" | "mean" | "min" | "max"
 
 /**
- * Configuration options for the AcurastOracleSDK.
+ * Configuration options for the AcelonSdk.
  * @property {string[]} [wssUrls] - Array of WebSocket URLs to connect to the Acurast processors.
  * @property {string[]} [oracles] - Array of processor public keys.
  * @property {number} [timeout] - Timeout in milliseconds for the requests.
  * @property {boolean} [logging] - Enable logging of the requests and responses.
  * @property {number} [errorThreshold] - Number of errors from oracles to wait for before throwing it. (Value from 0 to 1 that represents the percentage of ORACLES size)
  */
-export interface AcurastOracleSDKOptions {
+export interface AcelonSdkOptions {
   wssUrls?: string[]
   oracles?: string[]
   timeout?: number

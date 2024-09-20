@@ -1,6 +1,6 @@
-# Acurast Oracle SDK
+# Acelon SDK
 
-The Acurast Oracle SDK is a TypeScript library that provides a simple interface to interact with the Acurast Oracle Service. It allows developers to fetch price data for various cryptocurrency pairs, with signatures from multiple oracles.
+The Acelon SDK is a TypeScript library that provides a simple interface to interact with the Acelon Service. It allows developers to fetch price data for various cryptocurrency pairs, with signatures from multiple oracles.
 
 ## Features
 
@@ -11,10 +11,10 @@ The Acurast Oracle SDK is a TypeScript library that provides a simple interface 
 
 ## Installation
 
-To install the Acurast Oracle SDK, use yarn:
+To install the Acelon SDK, use yarn:
 
 ```bash
-yarn add acurast-oracle-service-sdk
+yarn add @acurast/oracle-service-sdk
 ```
 
 ## Usage
