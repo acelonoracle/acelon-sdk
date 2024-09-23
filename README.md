@@ -14,20 +14,20 @@ The Acelon SDK is a TypeScript library that provides a simple interface to inter
 To install the Acelon SDK, use yarn:
 
 ```bash
-yarn add @acurast/oracle-service-sdk
+yarn add @acelon/acelon-sdk
 ```
 
 ## Usage
 
 ### Initializing the SDK
 
-First, import and initialize the AcurastOracleSDK:
+First, import and initialize the Acelon Sdk:
 
 ```typescript
-import { AcurastOracleSDK } from "acurast-oracle-sdk"
+import { AcelonSdk } from '@acelon/acelon-sdk'
 
-const sdk = new AcurastOracleSDK({
-  timeout: 5000, // (optional) default 10 seconds
+const sdk = new AcelonSdk({
+  timeout: 10000, // (optional) default 10 seconds
   logging: true, // (optional) default false
   errorThreshold: 0.333, // (optional) default 0.333
 })
@@ -40,18 +40,18 @@ To fetch price data for cryptocurrency pairs:
 ```typescript
 const fetchPricesParams = {
   pairs: [
-    { from: "BTC", to: "USDT" },
-    { from: "ETH", to: "USDT" },
+    { from: 'BTC', to: 'USDT' },
+    { from: 'ETH', to: 'USDT' },
   ],
-  protocol: "EVM",
-  aggregation: "median",
+  protocol: 'EVM',
+  aggregation: 'median',
 }
 
 try {
   const priceData = await sdk.getPrices(fetchPricesParams, 2) // Require 2 verifications
-  console.log("Price data:", priceData)
+  console.log('Price data:', priceData)
 } catch (error) {
-  console.error("Error fetching prices:", error)
+  console.error('Error fetching prices:', error)
 }
 ```
 
@@ -62,9 +62,9 @@ To check the health status of supported exchanges:
 ```typescript
 try {
   const exchanges = await sdk.getExchanges()
-  console.log("Available exchanges:", exchanges)
+  console.log('Available exchanges:', exchanges)
 } catch (error) {
-  console.error("Error checking exchange health:", error)
+  console.error('Error checking exchange health:', error)
 }
 ```
 
@@ -84,37 +84,37 @@ await sdk.close()
 ;[
   {
     priceData: {
-      from: "BTC",
-      to: "USDT",
+      from: 'BTC',
+      to: 'USDT',
       decimals: 8,
       price: 5000000000000,
       timestamp: 1629300000000,
       sources: [
-        { exchangeId: "BNC", certificate: "cert1" },
-        { exchangeId: "CBP", certificate: "cert2" },
+        { exchangeId: 'BNC', certificate: 'cert1' },
+        { exchangeId: 'CBP', certificate: 'cert2' },
       ],
-      requestHash: "0x1234567890abcdef",
+      requestHash: '0x1234567890abcdef',
     },
-    packed: ["packed_data_1", "packed_data_2"],
-    signatures: ["signature1", "signature2"],
-    pubKeys: ["pubKey1", "pubKey2"],
+    packed: ['packed_data_1', 'packed_data_2'],
+    signatures: ['signature1', 'signature2'],
+    pubKeys: ['pubKey1', 'pubKey2'],
   },
   {
     priceData: {
-      from: "ETH",
-      to: "USDT",
+      from: 'ETH',
+      to: 'USDT',
       decimals: 8,
       price: 300000000000,
       timestamp: 1629300000000,
       sources: [
-        { exchangeId: "BNC", certificate: "cert1" },
-        { exchangeId: "CBP", certificate: "cert2" },
+        { exchangeId: 'BNC', certificate: 'cert1' },
+        { exchangeId: 'CBP', certificate: 'cert2' },
       ],
-      requestHash: "0x1234567890abcdef",
+      requestHash: '0x1234567890abcdef',
     },
-    packed: ["packed_data_3", "packed_data_4"],
-    signatures: ["signature3", "signature4"],
-    pubKeys: ["pubKey1", "pubKey2"],
+    packed: ['packed_data_3', 'packed_data_4'],
+    signatures: ['signature3', 'signature4'],
+    pubKeys: ['pubKey1', 'pubKey2'],
   },
 ]
 ```
@@ -122,17 +122,17 @@ await sdk.close()
 ### getExchanges Response
 
 ```typescript
-;["BNC", "CBP", "BFX", "KRK", "GEM"]
+;['BNC', 'CBP', 'BFX', 'KRK', 'GEM']
 ```
 
 ## Description
 
-### `AcurastOracleSDK`
+### `AcelonSdk`
 
 #### Constructor
 
 ```typescript
-constructor(options: AcurastOracleSDKOptions)
+constructor(options: AcelonSdkOptions)
 ```
 
 - `options.wssUrls`: (Optional) Array of WebSocket URLs to connect to the Acurast processors.
