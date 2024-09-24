@@ -21,28 +21,28 @@ async function testSDK() {
 
   const acelonSdk = new AcelonSdk(options)
 
-  const ping = await acelonSdk.ping()
-  console.log('Ping:', ping)
+  // const ping = await acelonSdk.ping()
+  // console.log('Ping:', ping)
 
-  // try {
-  //   const params: FetchPricesParams = {
-  //     pairs: [
-  //       {
-  //         from: 'SOL',
-  //         to: 'USDT',
-  //         decimals: 9,
-  //       },
-  //     ],
-  //     protocol: 'EVM',
-  //     aggregation: ['median'],
-  //   }
+  try {
+    const params: FetchPricesParams = {
+      pairs: [
+        {
+          from: 'SOL',
+          to: 'USDT',
+          decimals: 9,
+        },
+      ],
+      protocol: 'EVM',
+      aggregation: ['median'],
+    }
 
-  //   const prices = await acelonSdk.getPrices(params, 2)
+    const prices = await acelonSdk.getPrices(params, 2)
 
-  //   console.log('Prices:', JSON.stringify(prices, null, 2))
-  // } catch (error) {
-  //   console.error('Error:', error)
-  // }
+    console.log('Prices:', JSON.stringify(prices, null, 2))
+  } catch (error) {
+    console.error('Error:', error)
+  }
 }
 
 testSDK()

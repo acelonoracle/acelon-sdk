@@ -8,7 +8,6 @@
   "scripts": {
     "build": "tsc",
     "test": "yarn run ts-node ./test/test.ts",
-    "monitor": "yarn run ts-node ./test/monitoring.ts",
     "prepublishOnly": "yarn build"
   },
   "keywords": [
