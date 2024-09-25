@@ -3,19 +3,8 @@ import { AcelonSdkOptions, FetchPricesParams } from '../dist/types'
 
 async function testSDK() {
   const options: AcelonSdkOptions = {
-    oracles: [
-      '0x0291a83db9cbf2a4a52c9c87cf41951296a1dad191a9bd878482490ff07320d0a8',
-      '0x03572af886cd6d0b79d6be79aad891e4c774502bf87044d623708045b6e6e81c09',
-      '0x0340c21bd552585cbf1226de8a5abe4632584c4a14ee7529f6c1283ca6b2003d59',
-      '0x0290a29305ffcbc549344742b305b5900f855823d42ce41c57cebf3b972dccad46',
-      '0x0204452f576895bade73a4b104472f6763263032c2853ae60b6345789610395f34',
-      '0x0204452f576895bade73a4b104472f6763263032c2853ae60b6345789610395f31',
-    ],
-    wssUrls: [
-      'wss://websocket-proxy-1.prod.gke.acurast.com',
-      'wss://websocket-proxy-2.prod.gke.acurast.com',
-    ],
     errorThreshold: 0.333,
+    timeout: 20000,
     logging: true,
   }
 
@@ -28,16 +17,26 @@ async function testSDK() {
     const params: FetchPricesParams = {
       pairs: [
         {
-          from: 'SOL',
+          from: 'BTC',
           to: 'USDT',
-          decimals: 9,
+          decimals: 6,
+        },
+        {
+          from: 'USDT',
+          to: 'USD',
+          decimals: 6,
+        },
+        {
+          from: 'XTZ',
+          to: 'USDT',
+          decimals: 6,
         },
       ],
-      protocol: 'EVM',
+      protocol: 'Tezos',
       aggregation: ['median'],
     }
 
-    const prices = await acelonSdk.getPrices(params, 2)
+    const prices = await acelonSdk.getPrices(params, 3)
 
     console.log('Prices:', JSON.stringify(prices, null, 2))
   } catch (error) {

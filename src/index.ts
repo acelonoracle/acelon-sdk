@@ -48,7 +48,7 @@ export class AcelonSdk {
    */
   constructor(options: AcelonSdkOptions) {
     this.keyPair = this.generateKeyPair()
-    this.timeout = options.timeout || 10 * 1000 // Default 10 seconds timeout
+    this.timeout = options.timeout || 20 * 1000 // Default 20 seconds timeout
     this.logging = options.logging || false
     this.errorThreshold = options.errorThreshold || 0.333
 

@@ -27,7 +27,7 @@ First, import and initialize the Acelon Sdk:
 import { AcelonSdk } from '@acelon/acelon-sdk'
 
 const sdk = new AcelonSdk({
-  timeout: 10000, // (optional) default 10 seconds
+  timeout: 20000, // (optional) default 20 seconds
   logging: true, // (optional) default false
   errorThreshold: 0.333, // (optional) default 0.333
 })
@@ -137,7 +137,7 @@ constructor(options: AcelonSdkOptions)
 
 - `options.wssUrls`: (Optional) Array of WebSocket URLs to connect to the Acurast processors.
 - `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the AcurastOracleService. By default it will use the public keys from the AcurastOracleService.
-- `options.timeout`: (Optional) Timeout in milliseconds for the requests. Default: 10 seconds.
+- `options.timeout`: (Optional) Timeout in milliseconds for the requests. Default: 20 seconds.
 - `options.logging`: (Optional) Enable or disable logs. Default: false.
 - `options.errorThreshold`: (Optional) Value from 0 to 1 that determines the percentage of oracles that have to respond with the same error for it to be thrown by the sdk. Default: 0.333.
 
