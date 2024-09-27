@@ -132,14 +132,21 @@ await sdk.close()
 #### Constructor
 
 ```typescript
-constructor(options: AcelonSdkOptions)
+new AcelonSdk(options: AcelonSdkOptions)
 ```
 
 - `options.wssUrls`: (Optional) Array of WebSocket URLs to connect to the Acurast processors.
-- `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the AcurastOracleService. By default it will use the public keys from the AcurastOracleService.
+- `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the Acelon Oracle. By default it will use the public keys from the Acelon Service.
 - `options.timeout`: (Optional) Timeout in milliseconds for the requests. Default: 20 seconds.
 - `options.logging`: (Optional) Enable or disable logs. Default: false.
 - `options.errorThreshold`: (Optional) Value from 0 to 1 that determines the percentage of oracles that have to respond with the same error for it to be thrown by the sdk. Default: 0.333.
+
+#### Custom Oracles
+
+If you want to use your own oracles :
+
+1. First you will need to deploy your own Acelon Oracles on Acurast. [Here](https://github.com/acelonoracle/acelon-oracle) you can find the Acelon Oracle to deploy. See the documentation for [deployment creation](https://docs.acurast.com/developers/deployment-creation).
+2. Once deployed, you will be able to get the public keys to use in the options when initializing the SDK.
 
 #### Methods
 
