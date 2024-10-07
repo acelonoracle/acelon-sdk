@@ -303,7 +303,13 @@ export class AcelonSdk {
     }
 
     // Check if protocol is valid
-    const validProtocols: Protocol[] = ['Substrate', 'EVM', 'WASM', 'Tezos', 'Youves']
+    const validProtocols: Protocol[] = [
+      'Substrate',
+      'EVM',
+      'WASM',
+      'Tezos',
+      'Youves',
+    ]
     if (!validProtocols.includes(params.protocol)) {
       throw new Error(`Invalid protocol: ${params.protocol}`)
     }
@@ -385,11 +391,12 @@ export class AcelonSdk {
       )
 
       return validCheck
-        ? responses.filter((response) =>
-            response.result.priceInfos.every(
-              (priceInfo: PriceInfo, index: number) =>
+        ? responses.filter(
+            (response) =>
+              response.result.priceInfos.length > 0 &&
+              response.result.priceInfos.every((priceInfo: PriceInfo) =>
                 this.isValidResponse(priceInfo)
-            )
+              )
           )
         : responses
     }
@@ -405,9 +412,28 @@ export class AcelonSdk {
       }
     }
 
+    const handlePriceErrors = (
+      responses: OracleResponse<FetchPricesResult>[]
+    ) => {
+      if (responses.length > 0) {
+        const priceErrors = responses.flatMap(
+          (response) => response.result.priceErrors
+        )
+        if (priceErrors.length > 0) {
+          this.log(
+            `fetchPrices errors: \n${priceErrors
+              .map((error) => `${error.from}-${error.to} : ${error.message}`)
+              .join(',\n')}`,
+            'error'
+          )
+        }
+      }
+    }
+
     // If no verifications are required, return the first response
     if (verifications === 0) {
       const responses = await fetchPrices(params, 1)
+      handlePriceErrors(responses)
       handleInsufficientResponses(responses, 1)
       return this.combineSignedPrices(responses)
     }
@@ -415,6 +441,7 @@ export class AcelonSdk {
     // If prices are already provided, skip the initial fetch
     if (params.pairs.every((pair) => pair.price !== undefined)) {
       const validResponses = await fetchPrices(params, verifications, true)
+      handlePriceErrors(validResponses)
       handleInsufficientResponses(validResponses, verifications)
       return this.combineSignedPrices(validResponses)
     } else {
@@ -425,13 +452,33 @@ export class AcelonSdk {
         )} Fetching initial prices for verification...`
       )
       const initialResponses = await fetchPrices(params, 1)
+      handlePriceErrors(initialResponses)
       handleInsufficientResponses(initialResponses, 1)
       const firstResponse = initialResponses[0].result
-      this.log(`📬 Initial prices fetched: ${firstResponse}`)
+      this.log(
+        `📬 Initial prices fetched: 
+${firstResponse.priceInfos
+  .map(
+    (info) =>
+      `${info.from}-${info.to}: ${Object.entries(info.price)
+        .map(([type, value]) => `${type}=${value}`)
+        .join(', ')}`
+  )
+  .join(', ')}`
+      )
+
+      // Create a set of pairs that returned errors
+      const errorPairs = new Set(
+        firstResponse.priceErrors.map((error) => `${error.from}-${error.to}`)
+      )
+      // Filter out the pairs that are in priceErrors
+      const validPairs = params.pairs.filter(
+        (pair) => !errorPairs.has(`${pair.from}-${pair.to}`)
+      )
 
       const verificationParams = {
         ...params,
-        pairs: params.pairs.map((pair, index) => ({
+        pairs: validPairs.map((pair, index) => ({
           ...pair,
           price: Object.values(firstResponse.priceInfos[index].price),
           timestamp: firstResponse.priceInfos[index].timestamp,
@@ -443,6 +490,7 @@ export class AcelonSdk {
         verifications,
         true
       )
+      handlePriceErrors(validVerifications)
       handleInsufficientResponses(validVerifications, verifications)
       this.log(`🟢 Verifications: ${validVerifications.length}`)
       return this.combineSignedPrices(validVerifications)
