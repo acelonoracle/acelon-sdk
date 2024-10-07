@@ -291,6 +291,10 @@ export class AcelonSdk {
           `Pair at index ${index} must have 'from' and 'to' fields`
         )
       }
+
+      if (pair.decimals && (pair.decimals < 0 || pair.decimals > 18)) {
+        throw new Error('Decimals must be between 0 and 18')
+      }
     })
 
     // Check if protocol is present
@@ -299,7 +303,7 @@ export class AcelonSdk {
     }
 
     // Check if protocol is valid
-    const validProtocols: Protocol[] = ['Substrate', 'EVM', 'WASM', 'Tezos']
+    const validProtocols: Protocol[] = ['Substrate', 'EVM', 'WASM', 'Tezos', 'Youves']
     if (!validProtocols.includes(params.protocol)) {
       throw new Error(`Invalid protocol: ${params.protocol}`)
     }
