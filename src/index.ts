@@ -430,12 +430,90 @@ export class AcelonSdk {
       }
     }
 
-    // If no verifications are required, return the first response
-    if (verifications === 0) {
-      const responses = await fetchPrices(params, 1)
-      handlePriceErrors(responses)
-      handleInsufficientResponses(responses, 1)
-      return this.combineSignedPrices(responses)
+    const getVerificationParamsFromInitalResponses = async (
+      initialResponses: OracleResponse<FetchPricesResult>[]
+    ) => {
+      // Merge the responses
+      const mergedResponse: FetchPricesResult = {
+        priceInfos: [],
+        priceErrors: [],
+        signedPrices: [],
+        version: initialResponses[0].result.version,
+      }
+
+      // Collect all priceInfos and signedPrices
+      for (const response of initialResponses) {
+        mergedResponse.priceInfos.push(...response.result.priceInfos)
+        mergedResponse.signedPrices.push(...response.result.signedPrices)
+      }
+
+      // Handle priceErrors - only add if present in all responses
+      const allErrors = initialResponses.map(
+        (response) => response.result.priceErrors
+      )
+      const commonErrors = allErrors.reduce(
+        (common, errors) =>
+          common.filter((error) =>
+            errors.some(
+              (e) =>
+                e.from === error.from &&
+                e.to === error.to &&
+                e.message === error.message
+            )
+          ),
+        allErrors[0] || []
+      )
+      mergedResponse.priceErrors = commonErrors
+
+      // Remove duplicates from priceInfos based on 'from' and 'to' fields
+      mergedResponse.priceInfos = mergedResponse.priceInfos.filter(
+        (info, index, self) =>
+          index ===
+          self.findIndex((t) => t.from === info.from && t.to === info.to)
+      )
+
+      // Remove duplicates from signedPrices based on 'from' and 'to' fields in priceData
+      mergedResponse.signedPrices = mergedResponse.signedPrices.filter(
+        (signed, index, self) =>
+          index ===
+          self.findIndex(
+            (t) =>
+              t.priceData.from === signed.priceData.from &&
+              t.priceData.to === signed.priceData.to
+          )
+      )
+
+      this.log(
+        `📬 Initial prices fetched: 
+      ${mergedResponse.priceInfos
+        .map(
+          (info) =>
+            `${info.from}-${info.to}: ${Object.entries(info.price)
+              .map(([type, value]) => `${type}=${value}`)
+              .join(', ')}`
+        )
+        .join(', ')}`
+      )
+
+      // Create a set of pairs that returned errors
+      const errorPairs = new Set(
+        mergedResponse.priceErrors.map((error) => `${error.from}-${error.to}`)
+      )
+      // Filter out the pairs that are in priceErrors
+      const validPairs = params.pairs.filter(
+        (pair) => !errorPairs.has(`${pair.from}-${pair.to}`)
+      )
+
+      const verificationParams = {
+        ...params,
+        pairs: validPairs.map((pair, index) => ({
+          ...pair,
+          price: Object.values(mergedResponse.priceInfos[index].price),
+          timestamp: mergedResponse.priceInfos[index].timestamp,
+        })),
+      }
+
+      return verificationParams
     }
 
     // If prices are already provided, skip the initial fetch
@@ -451,39 +529,14 @@ export class AcelonSdk {
           (pair) => pair.from + '-' + pair.to
         )} Fetching initial prices for verification...`
       )
-      const initialResponses = await fetchPrices(params, 1)
+      //fetch 3 initial responses to get initial prices for verification
+      const initialResponses = await fetchPrices(params, 3)
       handlePriceErrors(initialResponses)
-      handleInsufficientResponses(initialResponses, 1)
-      const firstResponse = initialResponses[0].result
-      this.log(
-        `📬 Initial prices fetched: 
-${firstResponse.priceInfos
-  .map(
-    (info) =>
-      `${info.from}-${info.to}: ${Object.entries(info.price)
-        .map(([type, value]) => `${type}=${value}`)
-        .join(', ')}`
-  )
-  .join(', ')}`
-      )
+      handleInsufficientResponses(initialResponses, 3)
 
-      // Create a set of pairs that returned errors
-      const errorPairs = new Set(
-        firstResponse.priceErrors.map((error) => `${error.from}-${error.to}`)
+      const verificationParams = await getVerificationParamsFromInitalResponses(
+        initialResponses
       )
-      // Filter out the pairs that are in priceErrors
-      const validPairs = params.pairs.filter(
-        (pair) => !errorPairs.has(`${pair.from}-${pair.to}`)
-      )
-
-      const verificationParams = {
-        ...params,
-        pairs: validPairs.map((pair, index) => ({
-          ...pair,
-          price: Object.values(firstResponse.priceInfos[index].price),
-          timestamp: firstResponse.priceInfos[index].timestamp,
-        })),
-      }
 
       const validVerifications = await fetchPrices(
         verificationParams,
