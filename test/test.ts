@@ -5,11 +5,11 @@ async function testSDK() {
   const options: AcelonSdkOptions = {
     wssUrls: ['wss://websocket-proxy-2.prod.gke.acurast.com'],
     oracles: [
-      '0x03149298e461df2e1087e5d08bb9ef6d5ce320c0926352d8cc5cb2c955dc178dac',
-      '0x02fea43a222e374b36807d0a061531f5cb237b3260d64007b7025d80fbc8d1d0f8',
-      '0x02ac3f2f3a8ee7c7b3666d2205d9f7056ac7d29999448b46a95dabce9a7fcedb0e',
-      '0x02508d1c94d1ae31fbf1f66a308b392ac6c4bd58adceab80b6fe5306978f02147e',
-      '0x02a2a801940eec2c2d37f8c98e544c211f00fb4bc07c25aafafb164d65396eacbb',
+      '0x03d978f37aa84d7859f885b0d5a46ecc1f73907993c622f5cfe2441468ca877c74',
+      '0x03ac212ecc7bca734cb30bd38df2bea9ed2dd8d6cc63132f3c51957c2ccb7aeb04',
+      '0x02ed3e0cb56f50c38ef953a61238880b26520ad32fecd09a3f515fcf6e83202f9c',
+      '0x03fff0c248fba1b520463494161566b2c95f12eccc6cafabd267c82f8cf5fc95a8',
+      '0x035a3b10ae00d3c32319baebaee9d99d042e35394e1f96cc451ec5d0ee85421b39',
     ],
     errorThreshold: 0.333,
     logging: true,
@@ -31,7 +31,7 @@ async function testSDK() {
           decimals: 6,
         },
         {
-          from: 'USDT',
+          from: 'XXX',
           to: 'USD',
           decimals: 6,
         },

@@ -1,12 +1,12 @@
 /**
  * List of supported blockchain protocols.
  */
-export type Protocol = "Substrate" | "EVM" | "WASM" | "Tezos" | "Youves"
+export type Protocol = 'Substrate' | 'EVM' | 'WASM' | 'Tezos' | 'Youves'
 
 /**
  * Aggregation types that can be used on the processors.
  */
-export type AggregationType = "median" | "mean" | "min" | "max"
+export type AggregationType = 'median' | 'mean' | 'min' | 'max'
 
 /**
  * Configuration options for the AcelonSdk.
@@ -81,11 +81,13 @@ export interface CheckExchangeHealthParams {
 /**
  * Result of fetching prices.
  * @property {PriceInfo[]} priceInfos - Detailed price information for each requested pair.
+ * @property {PriceError[]} priceErrors - Errors in fetching specific pairs.
  * @property {SignedPrice[]} signedPrices - Signed price data for each requested pair.
  * @property {string} version - Version of the oracle service.
  */
 export interface FetchPricesResult {
   priceInfos: PriceInfo[]
+  priceErrors: PriceError[]
   signedPrices: SignedPrice[]
   version: string
 }
@@ -112,6 +114,12 @@ export interface PriceInfo {
   rawPrices: number[]
   stdDev: number
   sources: Array<{ exchangeId: string; certificate: string }>
+}
+
+export interface PriceError {
+  from: string
+  to: string
+  message: string
 }
 
 /**
@@ -176,7 +184,7 @@ export interface CheckExchangeHealthResult {
  */
 export interface ExchangeHealthStatus {
   exchangeId: string
-  status: "up" | "down"
+  status: 'up' | 'down'
   responseTime?: number
 }
 
