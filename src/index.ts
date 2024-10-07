@@ -50,7 +50,7 @@ export class AcelonSdk {
     this.keyPair = this.generateKeyPair()
     this.timeout = options.timeout || 20 * 1000 // Default 20 seconds timeout
     this.logging = options.logging || false
-    this.errorThreshold = options.errorThreshold || 0.333
+    this.errorThreshold = options.errorThreshold || 3
 
     this.initPromise = this.init(options)
   }
@@ -171,10 +171,7 @@ export class AcelonSdk {
           pendingRequest.errorCounts.set(errorCode, currentCount)
 
           // Check if this error type has reached the threshold
-          const errorThresholdCount = Math.ceil(
-            this.oracles.length * this.errorThreshold
-          )
-          if (currentCount >= errorThresholdCount) {
+          if (currentCount >= this.errorThreshold) {
             clearTimeout(pendingRequest.timer)
             this.pendingRequests.delete(payload.id)
             pendingRequest.reject(

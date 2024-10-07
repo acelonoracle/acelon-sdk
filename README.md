@@ -29,7 +29,7 @@ import { AcelonSdk } from '@acelon/acelon-sdk'
 const sdk = new AcelonSdk({
   timeout: 20000, // (optional) default 20 seconds
   logging: true, // (optional) default false
-  errorThreshold: 0.333, // (optional) default 0.333
+  errorThreshold: 3, // (optional) default 3
 })
 ```
 
@@ -139,7 +139,7 @@ new AcelonSdk(options: AcelonSdkOptions)
 - `options.oracles`: (Optional) Array of processor public keys. These have to be public keys of processors that are running the Acelon Oracle. By default it will use the public keys from the Acelon Service.
 - `options.timeout`: (Optional) Timeout in milliseconds for the requests. Default: 20 seconds.
 - `options.logging`: (Optional) Enable or disable logs. Default: false.
-- `options.errorThreshold`: (Optional) Value from 0 to 1 that determines the percentage of oracles that have to respond with the same error for it to be thrown by the sdk. Default: 0.333.
+- `options.errorThreshold`: (Optional) Number of oracles that have to respond with the same error for it to be thrown by the sdk. Default: 3.
 
 #### Custom Oracles
 

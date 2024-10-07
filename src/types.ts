@@ -1,7 +1,7 @@
 /**
  * List of supported blockchain protocols.
  */
-export type Protocol = "Substrate" | "EVM" | "WASM" | "Tezos"
+export type Protocol = "Substrate" | "EVM" | "WASM" | "Tezos" | "Youves"
 
 /**
  * Aggregation types that can be used on the processors.
@@ -14,7 +14,7 @@ export type AggregationType = "median" | "mean" | "min" | "max"
  * @property {string[]} [oracles] - Array of processor public keys.
  * @property {number} [timeout] - Timeout in milliseconds for the requests.
  * @property {boolean} [logging] - Enable logging of the requests and responses.
- * @property {number} [errorThreshold] - Number of errors from oracles to wait for before throwing it. (Value from 0 to 1 that represents the percentage of ORACLES size)
+ * @property {number} [errorThreshold] - Number of errors from oracles to wait for before throwing it.
  */
 export interface AcelonSdkOptions {
   wssUrls?: string[]
