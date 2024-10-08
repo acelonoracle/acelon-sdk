@@ -565,10 +565,12 @@ export class AcelonSdk {
           (pair) => pair.from + '-' + pair.to
         )} Fetching initial prices for verification...`
       )
-      //fetch 3 initial responses to get initial prices for verification
-      const initialResponses = await fetchPrices(params, 3)
+      //fetch initial responses to get initial prices for verification
+      const requiredInitial = Math.min(verifications, 3) || 1
+
+      const initialResponses = await fetchPrices(params, requiredInitial)
       handlePriceErrors(initialResponses)
-      handleInsufficientResponses(initialResponses, 3)
+      handleInsufficientResponses(initialResponses, requiredInitial)
 
       const verificationParams = await getVerificationParamsFromInitalResponses(
         initialResponses
