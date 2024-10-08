@@ -28,9 +28,12 @@ export class AcelonSdk {
       reject: Function
       timer: NodeJS.Timeout
       responses: Map<string, any>
+      validResponses: Map<string, any>
       errorResponses: Map<string, any>
       errorCounts: Map<number, number>
       requiredResponses: number
+      validCheck: boolean
+      checkAndResolve: () => void
     }
   > = new Map()
   private initPromise: Promise<void>
@@ -146,7 +149,7 @@ export class AcelonSdk {
     try {
       const payload = JSON.parse(Buffer.from(message.payload, 'hex').toString())
       const sender = Buffer.from(message.sender).toString('hex')
-      this.log(`📦 Received payload from ${sender}`)
+      this.log(`📦 Received payload from ${sender} for request ${payload.id}`)
 
       // Requests are divided by ID. Each call to sendRequestToOracles creates a new ID, so we can
       // track the responses for each request separately
@@ -182,18 +185,21 @@ export class AcelonSdk {
             return
           }
         } else {
-          pendingRequest.responses.set(sender, {
+          const response = {
             result: payload.result,
             sender,
-          })
+          }
+          pendingRequest.responses.set(sender, response)
+
+          if (
+            pendingRequest.validCheck &&
+            this.isValidResponse(payload.result)
+          ) {
+            pendingRequest.validResponses.set(sender, response)
+          }
         }
 
-        // If we've received enough responses, resolve the promise
-        if (pendingRequest.responses.size >= pendingRequest.requiredResponses) {
-          clearTimeout(pendingRequest.timer)
-          this.pendingRequests.delete(payload.id)
-          pendingRequest.resolve(Array.from(pendingRequest.responses.values()))
-        }
+        pendingRequest.checkAndResolve()
       } else {
         // If we receive a response for a request we're not tracking, ignore it
         //this.log(`🥱 Received response for untracked request ... ignoring ${payload}`, "warn")
@@ -203,19 +209,33 @@ export class AcelonSdk {
     }
   }
 
+  private isValidResponse(result: any): boolean {
+    return (
+      result.priceInfos &&
+      result.priceInfos.length > 0 &&
+      result.priceInfos.every(
+        (priceInfo: PriceInfo) =>
+          priceInfo.validation &&
+          Object.values(priceInfo.validation).every((value) => value === true)
+      )
+    )
+  }
+
   // Sends a request to multiple oracles and waits for responses
   // Returns a promise that resolves when enough responses are received - or rejects on timeout
   private async sendRequestToOracles<T>(
     method: string,
     params: FetchPricesParams | CheckExchangeHealthParams,
     requiredResponses: number = 0,
-    enableTimeoutError: boolean = true
+    enableTimeoutError: boolean = true,
+    validCheck: boolean = false
   ): Promise<OracleResponse<T>[]> {
     await this.initPromise
 
     return new Promise((resolve, reject) => {
       const requestId = uuidv4()
       const responses = new Map<string, OracleResponse<T>>()
+      const validResponses = new Map<string, OracleResponse<T>>()
       const errorResponses = new Map<string, OracleResponse<T>>()
       const errorCounts = new Map<number, number>()
 
@@ -223,24 +243,54 @@ export class AcelonSdk {
         if (this.pendingRequests.has(requestId)) {
           if (enableTimeoutError) {
             this.pendingRequests.delete(requestId)
-            reject(new Error(`Request timed out after ${this.timeout}ms`))
+            reject(
+              new Error(
+                `⌛ Request ${requestId} timed out after ${this.timeout}ms`
+              )
+            )
           } else {
-            const collectedResponses = Array.from(responses.values())
+            const collectedResponses = Array.from(
+              validCheck ? validResponses.values() : responses.values()
+            )
             this.pendingRequests.delete(requestId)
             resolve(collectedResponses)
           }
         }
       }, this.timeout)
 
+      const checkAndResolve = () => {
+        if (
+          (validCheck && validResponses.size >= requiredResponses) ||
+          (!validCheck && responses.size >= requiredResponses)
+        ) {
+          clearTimeout(timer)
+          this.pendingRequests.delete(requestId)
+          resolve(
+            Array.from(
+              validCheck ? validResponses.values() : responses.values()
+            )
+          )
+        }
+      }
+
       this.pendingRequests.set(requestId, {
         resolve,
         reject,
         timer,
         responses,
+        validResponses,
         errorResponses,
         errorCounts,
         requiredResponses,
+        validCheck,
+        checkAndResolve,
       })
+
+      this.log(
+        `📤 Sending ${method} request ${requestId} to ${
+          this.oracles.length
+        } oracles :\n${JSON.stringify(params)}`
+      )
 
       this.oracles.forEach((oracle) => {
         this.sendRequest(method, params, oracle, requestId).catch((error) => {
@@ -267,15 +317,9 @@ export class AcelonSdk {
     }
 
     const message = JSON.stringify(request)
-    this.log(`📤 Sending ${method} request to oracle ${oracle}: ${message}`)
+    // this.log(`📤 Sending ${method} request to oracle ${oracle}: ${message}`)
 
     await this.client.send(oracle, message)
-  }
-
-  // Check if all prices in a response are valid
-  private isValidResponse(priceInfo: PriceInfo): boolean {
-    if (!priceInfo.validation) return false
-    return Object.values(priceInfo.validation).every((value) => value === true)
   }
 
   private validateFetchPricesParams(params: FetchPricesParams): void {
@@ -384,21 +428,13 @@ export class AcelonSdk {
       requiredResponses: number,
       validCheck: boolean = false
     ): Promise<OracleResponse<FetchPricesResult>[]> => {
-      const responses = await this.sendRequestToOracles<FetchPricesResult>(
+      return this.sendRequestToOracles<FetchPricesResult>(
         'fetchPrices',
         params,
-        requiredResponses
+        requiredResponses,
+        true,
+        validCheck
       )
-
-      return validCheck
-        ? responses.filter(
-            (response) =>
-              response.result.priceInfos.length > 0 &&
-              response.result.priceInfos.every((priceInfo: PriceInfo) =>
-                this.isValidResponse(priceInfo)
-              )
-          )
-        : responses
     }
 
     const handleInsufficientResponses = (
