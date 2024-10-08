@@ -8,11 +8,11 @@ import {
   CheckExchangeHealthParams,
   FetchPricesParams,
   FetchPricesResult,
-  PriceInfo,
   GetPricesResult,
   OracleResponse,
   AggregationType,
   Protocol,
+  PriceInfo,
 } from './types'
 
 /**
@@ -33,6 +33,7 @@ export class AcelonSdk {
       errorCounts: Map<number, number>
       requiredResponses: number
       validCheck: boolean
+      requestedPairsCount: number | undefined
       checkAndResolve: () => void
     }
   > = new Map()
@@ -71,11 +72,13 @@ export class AcelonSdk {
     ) {
       this.log('🔍 Fetching default settings ...')
       defaultSettings = await this.fetchDefaultSettings()
-      this.log(`Fetched default settings: ${JSON.stringify(defaultSettings)}`)
+      this.log(
+        `Fetched default settings: ${defaultSettings.wssUrls.length} wssUrls, ${defaultSettings.oracles.length} oracles`
+      )
     }
 
     if (options.oracles && options.oracles.length > 0) {
-      this.log(`Using provided oracles : ${options.oracles}`)
+      this.log(`Using provided oracles ...`)
       this.oracles = options.oracles
     } else if (defaultSettings.oracles.length > 0) {
       this.log('Using default oracles ...')
@@ -193,7 +196,10 @@ export class AcelonSdk {
 
           if (
             pendingRequest.validCheck &&
-            this.isValidResponse(payload.result)
+            this.isValidResponse(
+              payload.result,
+              pendingRequest.requestedPairsCount || 0
+            )
           ) {
             pendingRequest.validResponses.set(sender, response)
           }
@@ -209,16 +215,59 @@ export class AcelonSdk {
     }
   }
 
-  private isValidResponse(result: any): boolean {
-    return (
-      result.priceInfos &&
-      result.priceInfos.length > 0 &&
-      result.priceInfos.every(
-        (priceInfo: PriceInfo) =>
-          priceInfo.validation &&
-          Object.values(priceInfo.validation).every((value) => value === true)
+  private isValidResponse(
+    result: FetchPricesResult,
+    requestedPairsCount: number
+  ): boolean {
+    if (!result.priceInfos) {
+      this.log('⚠️ Invalid response: priceInfos is missing', 'warn')
+      return false
+    }
+
+    if (result.priceInfos.length !== requestedPairsCount) {
+      this.log(
+        `⚠️ Invalid response: ${
+          result.priceInfos.length
+        } / ${requestedPairsCount} expected pairs : ${result.priceInfos
+          .map((p: PriceInfo) => `${p.from}-${p.to}`)
+          .join(', ')}`,
+        'warn'
       )
-    )
+      return false
+    }
+
+    for (let i = 0; i < result.priceInfos.length; i++) {
+      const priceInfo = result.priceInfos[i]
+      if (!priceInfo.validation) {
+        this.log(
+          `⚠️ Invalid response: Validation missing for pair ${i + 1} (${
+            priceInfo.from
+          }-${priceInfo.to})`,
+          'warn'
+        )
+        return false
+      }
+
+      const invalidValidations = Object.entries(priceInfo.validation)
+        .filter(([key, value]) => value !== true)
+        .map(([key]) => key)
+
+      if (invalidValidations.length > 0) {
+        this.log(
+          `❌ Invalid response: ${priceInfo.from}-${
+            priceInfo.to
+          } - ${invalidValidations.join(', ')} : ${JSON.stringify(
+            priceInfo.price
+          )}`,
+          'warn'
+        )
+
+        return false
+      }
+    }
+
+    this.log('✅ Valid response: All validations passed', 'default')
+    return true
   }
 
   // Sends a request to multiple oracles and waits for responses
@@ -238,6 +287,10 @@ export class AcelonSdk {
       const validResponses = new Map<string, OracleResponse<T>>()
       const errorResponses = new Map<string, OracleResponse<T>>()
       const errorCounts = new Map<number, number>()
+
+      // Get the number of requested pairs if it's a FetchPricesParams
+      const requestedPairsCount =
+        (params as FetchPricesParams).pairs?.length || undefined
 
       const timer = setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
@@ -283,6 +336,7 @@ export class AcelonSdk {
         errorCounts,
         requiredResponses,
         validCheck,
+        requestedPairsCount,
         checkAndResolve,
       })
 
@@ -359,15 +413,17 @@ export class AcelonSdk {
     }
 
     // Check minSources against exchanges length
-    if (
-      params.exchanges &&
-      params.minSources &&
-      params.minSources > params.exchanges.length
-    ) {
-      throw new Error(
-        `minSources (${params.minSources}) cannot be greater than the number of exchanges (${params.exchanges.length})`
-      )
-    }
+    params.pairs.forEach((pair, index) => {
+      if (
+        pair.exchanges &&
+        params.minSources &&
+        params.minSources > pair.exchanges.length
+      ) {
+        throw new Error(
+          `minSources (${params.minSources}) cannot be greater than the number of exchanges (${pair.exchanges.length}) for pair at index ${index}`
+        )
+      }
+    })
 
     // Check tradeAgeLimit
     if (params.tradeAgeLimit !== undefined && params.tradeAgeLimit <= 0) {
@@ -466,87 +522,69 @@ export class AcelonSdk {
       }
     }
 
-    const getVerificationParamsFromInitalResponses = async (
+    const getVerificationParamsFromInitalResponses = (
       initialResponses: OracleResponse<FetchPricesResult>[]
-    ) => {
-      // Merge the responses
-      const mergedResponse: FetchPricesResult = {
-        priceInfos: [],
-        priceErrors: [],
-        signedPrices: [],
-        version: initialResponses[0].result.version,
-      }
+    ): FetchPricesParams => {
+      const pairData: Record<string, { price: number[]; timestamp: number }> =
+        {}
+      const pairExchanges: Record<string, Map<string, number>> = {}
 
-      // Collect all priceInfos and signedPrices
-      for (const response of initialResponses) {
-        mergedResponse.priceInfos.push(...response.result.priceInfos)
-        mergedResponse.signedPrices.push(...response.result.signedPrices)
-      }
+      // Step 1: Extract prices and timestamps for each pair
+      initialResponses.forEach((response) => {
+        response.result.priceInfos.forEach((info) => {
+          const pairKey = `${info.from}-${info.to}`
+          if (!pairData[pairKey]) {
+            pairData[pairKey] = {
+              price: Object.values(info.price),
+              timestamp: info.timestamp,
+            }
+          }
 
-      // Handle priceErrors - only add if present in all responses
-      const allErrors = initialResponses.map(
-        (response) => response.result.priceErrors
-      )
-      const commonErrors = allErrors.reduce(
-        (common, errors) =>
-          common.filter((error) =>
-            errors.some(
-              (e) =>
-                e.from === error.from &&
-                e.to === error.to &&
-                e.message === error.message
-            )
-          ),
-        allErrors[0] || []
-      )
-      mergedResponse.priceErrors = commonErrors
-
-      // Remove duplicates from priceInfos based on 'from' and 'to' fields
-      mergedResponse.priceInfos = mergedResponse.priceInfos.filter(
-        (info, index, self) =>
-          index ===
-          self.findIndex((t) => t.from === info.from && t.to === info.to)
-      )
-
-      // Remove duplicates from signedPrices based on 'from' and 'to' fields in priceData
-      mergedResponse.signedPrices = mergedResponse.signedPrices.filter(
-        (signed, index, self) =>
-          index ===
-          self.findIndex(
-            (t) =>
-              t.priceData.from === signed.priceData.from &&
-              t.priceData.to === signed.priceData.to
-          )
-      )
+          // Step 2: Count exchanges for each pair
+          if (!pairExchanges[pairKey]) {
+            pairExchanges[pairKey] = new Map()
+          }
+          info.sources.forEach((source) => {
+            const count = pairExchanges[pairKey].get(source.exchangeId) || 0
+            pairExchanges[pairKey].set(source.exchangeId, count + 1)
+          })
+        })
+      })
 
       this.log(
-        `📬 Initial prices fetched: 
-      ${mergedResponse.priceInfos
-        .map(
-          (info) =>
-            `${info.from}-${info.to}: ${Object.entries(info.price)
-              .map(([type, value]) => `${type}=${value}`)
-              .join(', ')}`
-        )
-        .join(', ')}`
+        `📬 Initial prices fetched: ${Object.entries(pairData)
+          .map(([pairKey, data]) => `${pairKey} ${data.price.join(', ')}`)
+          .join(' , ')}`
       )
 
-      // Create a set of pairs that returned errors
-      const errorPairs = new Set(
-        mergedResponse.priceErrors.map((error) => `${error.from}-${error.to}`)
-      )
-      // Filter out the pairs that are in priceErrors
-      const validPairs = params.pairs.filter(
-        (pair) => !errorPairs.has(`${pair.from}-${pair.to}`)
-      )
+      // Step 3: Select top exchanges for each pair
+      const selectedExchanges: Record<string, string[]> = {}
+      Object.keys(pairExchanges).forEach((pairKey) => {
+        const exchanges = Array.from(pairExchanges[pairKey].entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, params.minSources || 1)
+          .map(([exchangeId]) => exchangeId)
+        selectedExchanges[pairKey] = exchanges
+      })
 
-      const verificationParams = {
+      // Step 4: Prepare verification params
+      const verificationParams: FetchPricesParams = {
         ...params,
-        pairs: validPairs.map((pair, index) => ({
-          ...pair,
-          price: Object.values(mergedResponse.priceInfos[index].price),
-          timestamp: mergedResponse.priceInfos[index].timestamp,
-        })),
+        pairs: params.pairs
+          .filter((pair) => {
+            const pairKey = `${pair.from}-${pair.to}`
+            return pairData.hasOwnProperty(pairKey)
+          })
+          .map((pair) => {
+            const pairKey = `${pair.from}-${pair.to}`
+            const data = pairData[pairKey]
+            return {
+              ...pair,
+              price: data.price,
+              timestamp: data.timestamp,
+              exchanges: selectedExchanges[pairKey], // Update exchanges per pair
+            }
+          }),
       }
 
       return verificationParams
@@ -581,6 +619,8 @@ export class AcelonSdk {
         verifications,
         true
       )
+      // this.log(`Verification params: ${JSON.stringify(verificationParams)}`)
+
       handlePriceErrors(validVerifications)
       handleInsufficientResponses(validVerifications, verifications)
       this.log(`🟢 Verifications: ${validVerifications.length}`)
@@ -599,16 +639,11 @@ export class AcelonSdk {
     const combinedSignedPrices = responses[0].result.signedPrices.map(
       (firstSignedPrice) => {
         const allSignedPrices = responses.flatMap((response) =>
-          response.result.signedPrices
-            .filter(
-              (sp) =>
-                sp.priceData.from === firstSignedPrice.priceData.from &&
-                sp.priceData.to === firstSignedPrice.priceData.to
-            )
-            .map((sp) => ({
-              ...sp,
-              pubKey: this.idToPubKeyMap[response.sender],
-            }))
+          response.result.signedPrices.filter(
+            (sp) =>
+              sp.priceData.from === firstSignedPrice.priceData.from &&
+              sp.priceData.to === firstSignedPrice.priceData.to
+          )
         )
 
         return {

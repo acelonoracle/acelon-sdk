@@ -159,10 +159,10 @@ Fetches price data from the oracle network.
     - `from`: String, from symbol.
     - `to`: String, to symbol.
     - `decimals`: Number of decimals for the price.
+    - `exchanges`: (Optional) List of exchange IDs to use as sources on the oracles. Default: all available exchanges.
     - `price`: (Optional) Price(s) to verify against the oracle price. (Provide a price per aggregatyion type requested)
     - `timestamp`: (Optional) Number, timestamp of the provided prices.
   - `protocol`: Protocol to package and sign the price data for.
-  - `exchanges`: (Optional) List of exchange IDs to use as sources on the oracles. Default: all available exchanges.
   - `minSources`: (Optional) Minimum number of sources required. Default: 3.
   - `tradeAgeLimit`: (Optional) Maximum age of trade data in seconds. Default: 5 minutes.
   - `aggregation`: (Optional) Types of price aggregation requested from the oracles. Default: mean.
