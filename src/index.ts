@@ -412,11 +412,16 @@ export class AcelonSdk {
       throw new Error(`Invalid protocol: ${params.protocol}`)
     }
 
+    // Check minSources greater than 0
+    if (params.minSources !== undefined && params.minSources <= 0) {
+      throw new Error('minSources must be >= 0')
+    }
+
     // Check minSources against exchanges length
     params.pairs.forEach((pair, index) => {
       if (
         pair.exchanges &&
-        params.minSources &&
+        params.minSources !== undefined &&
         params.minSources > pair.exchanges.length
       ) {
         throw new Error(
@@ -590,8 +595,14 @@ export class AcelonSdk {
       return verificationParams
     }
 
-    // If prices are already provided, skip the initial fetch
-    if (params.pairs.every((pair) => pair.price !== undefined)) {
+    if (verifications === 0) {
+      // If verifications are not required, return the first response
+      const validResponses = await fetchPrices(params, verifications, false)
+      handlePriceErrors(validResponses)
+      handleInsufficientResponses(validResponses, verifications)
+      return this.combineSignedPrices(validResponses)
+    } else if (params.pairs.every((pair) => pair.price !== undefined)) {
+      // If prices are already provided, skip the initial fetch
       const validResponses = await fetchPrices(params, verifications, true)
       handlePriceErrors(validResponses)
       handleInsufficientResponses(validResponses, verifications)
