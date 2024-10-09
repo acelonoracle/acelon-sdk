@@ -567,7 +567,7 @@ export class AcelonSdk {
       Object.keys(pairExchanges).forEach((pairKey) => {
         const exchanges = Array.from(pairExchanges[pairKey].entries())
           .sort((a, b) => b[1] - a[1])
-          .slice(0, params.minSources || 1)
+          .slice(0, params.minSources || 3)
           .map(([exchangeId]) => exchangeId)
         selectedExchanges[pairKey] = exchanges
       })
