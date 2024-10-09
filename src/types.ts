@@ -1,7 +1,14 @@
 /**
- * List of supported blockchain protocols.
+ * List of supported protocols.
  */
-export type Protocol = 'Substrate' | 'EVM' | 'WASM' | 'Tezos' | 'Youves'
+export type Protocol =
+  | 'Substrate'
+  | 'EVM'
+  | 'WASM'
+  | 'Ink!'
+  | 'Gear'
+  | 'Tezos'
+  | 'Youves'
 
 /**
  * Aggregation types that can be used on the processors.
