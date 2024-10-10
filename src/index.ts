@@ -405,6 +405,8 @@ export class AcelonSdk {
       'Substrate',
       'EVM',
       'WASM',
+      'Ink!',
+      'Gear',
       'Tezos',
       'Youves',
     ]
